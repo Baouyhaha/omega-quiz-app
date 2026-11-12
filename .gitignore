@@ -1,0 +1,17 @@
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+android/local.properties
+*.keystore
+*.jks
+ios/Pods/
+.idea/
+*.iml
+.DS_Store
+.env
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
