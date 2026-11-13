@@ -18,3 +18,4 @@ flutter run
 ```
 
 Board công việc: https://trello.com/b/56zfgki0/omega-phần-mềm-kiểm-tra-trắc-nghiệm
+Phiên bản Flutter SDK dùng chung : Flutter 3.50.0
