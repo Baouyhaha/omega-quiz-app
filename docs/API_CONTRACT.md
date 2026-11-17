@@ -1,6 +1,6 @@
 # API Contract — Phần mềm kiểm tra trắc nghiệm (Omega)
 
-> BẢN NHÁP v1 — soạn ngày 12/11/2026 để nhóm trưởng duyệt trước hạn T03 (12/11 12:00).
+> BẢN NHÁP v1 — soạn ngày 12/11/2026 để nhóm trưởng duyệt trước hạn T09 (12/11 12:00).
 > Cập nhật 13/11/2026 (sau báo cáo buổi 2): bỏ đăng ký và đổi mật khẩu — tài khoản cấp theo email sinh viên, đăng nhập bằng Google.
 > Nguồn duy nhất: Phần D (chuẩn API/JSON) của `KE_HOACH_DO_AN_OMEGA_TRAC_NGHIEM.md`,
 > cộng các trường settings ở mục B3 và quy tắc chống gian lận ở mục B4.
@@ -200,8 +200,8 @@ hiện điểm ngay):
 ```
 
 - Điểm mỗi câu = điểm gốc của câu hỏi + điểm thưởng tốc độ. **Công thức điểm tốc độ
-  chưa chốt trong bản này — chốt trong tài liệu đặc tả T32 (hạn 13/11) rồi bổ sung
-  vào đây trước khi code T16.**
+  chưa chốt trong bản này — chốt trong tài liệu đặc tả T06 (hạn 13/11) rồi bổ sung
+  vào đây trước khi code T21.**
 - Hết giờ tự nộp hoặc đủ 5 lần thoát màn hình: `status` là `FORCE_SUBMITTED`,
   `violationCount` ghi vào kết quả để giáo viên thấy (mục B4).
 - Nộp bài offline: bài làm vào hàng đợi `PENDING_SYNC` trên máy, có mạng lại thì tự
@@ -275,7 +275,7 @@ này là một điểm kỹ thuật đáng thuyết trình.
 ## 7. Điểm cần chốt trước khi đóng băng (mở — nhóm quyết ở họp 12/11)
 
 1. **Số lượng endpoint: 28 hay 29?** Bảng D2 trong kế hoạch liệt kê 28 đầu mối
-   (đánh số 1–28). File phân công (T03) ghi "29 endpoint" — hai tài liệu lệch nhau 1.
+   (đánh số 1–28). File phân công (T09) ghi "29 endpoint" — hai tài liệu lệch nhau 1.
    Bản nháp này theo bảng D2 (28). Cần đối chiếu: có endpoint nào bị sót khỏi bảng D2
    không (ví dụ endpoint riêng cho đổi mật khẩu lần đầu, hoặc tách `topics/update`
    thành endpoint riêng)?
@@ -286,8 +286,8 @@ này là một điểm kỹ thuật đáng thuyết trình.
 3. **Đánh số trong mục D5 của kế hoạch:** D5 ghi "endpoint 19" (phát đề) và
    "endpoint 20" (nộp bài), nhưng theo bảng D2 thì phát đề là #15 và nộp bài là #16.
    Bản nháp này dùng số đúng theo bảng D2; kế hoạch cần sửa D5 cho khớp.
-4. **Công thức điểm tốc độ:** chưa có — chốt trong T32 (SRS, hạn 13/11) rồi bổ sung
-   vào mục 3.4 trước khi code T16. Không tự chế công thức trong bản contract này.
+4. **Công thức điểm tốc độ:** chưa có — chốt trong T06 (SRS, hạn 13/11) rồi bổ sung
+   vào mục 3.4 trước khi code T21. Không tự chế công thức trong bản contract này.
 5. **Cơ chế tài khoản — ĐÃ CHỐT (13/11/2026):** giảng viên yêu cầu bỏ tự đăng ký
    sau báo cáo buổi 2. Contract này đã sửa theo: đăng nhập bằng Google (#1), bỏ
    đổi mật khẩu (#2) và đăng ký (#3); mục E6 của kế hoạch (không có nút Đăng ký)

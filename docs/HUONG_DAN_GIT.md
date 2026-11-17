@@ -53,7 +53,7 @@ Quy định commit:
 Khi một chức năng chạy được và đã tự test:
 
 1. Push nhánh cá nhân lên GitHub.
-2. Mở Pull Request từ nhánh cá nhân vào `main`, tiêu đề ghi mã task (ví dụ: "T09 — Đăng nhập").
+2. Mở Pull Request từ nhánh cá nhân vào `main`, tiêu đề ghi mã task (ví dụ: "T14 — Đăng nhập").
 3. Task code phải kèm video tự test ngắn (30 giây – 2 phút) trong phần mô tả PR.
 4. Nhóm trưởng kiểm tra và merge. Người làm không tự merge PR của mình.
 
