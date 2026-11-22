@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
+import '../core/uy_theme.dart';
 import '../routes.dart';
 
 // ============================================================
 // MH-28 — Danh sách gói thuê
 // Luồng: L8 (Gói thuê và vòng đời hết hạn)
-// Vào từ: MH-29 (nút Gia hạn ngay) / MH-03 (nút Xem gói)
+// Vào từ: MH-29 (nút Gia hạn/Nâng cấp) / banner ở MH-02, MH-03
 // Đi tới: MH-29 sau khi đăng ký thành công (thanh toán mô phỏng)
-// Bố cục: dựng theo mockup Figma MH-28-danh-sach-goi — thẻ gói
-//         đang chọn có viền tím, nút đăng ký ở cuối đổi theo gói
-//         đang chọn, bảng so sánh hạn mức ở dưới
-// Dữ liệu giả: _mockGoi ngay dưới đây (giá lấy theo mockup Figma)
+// Bố cục: dựng theo mockup Figma MH-28-danh-sach-goi (4 thẻ gói,
+//         thẻ 90 ngày có nhãn "Phổ biến nhất", bảng so sánh hạn mức,
+//         nút đăng ký theo gói đã chọn dính đáy, ghi chú mô phỏng)
+// Giá gói: theo đúng mockup Figma (30 ngày 49.000đ, 90 ngày
+//         129.000đ, 365 ngày 449.000đ) — giá chính thức do nhóm chốt
 // Chức năng thật nối ở: UC02/UC03 (gói thuê, thanh toán mô phỏng)
 // ============================================================
 
-// MOCK: cac goi thue, gia theo mockup Figma cua Danh
+// MOCK: gia goi theo mockup Figma
 const _mockGoi = [
   {'ten': 'Dùng thử 7 ngày', 'moTa': 'Miễn phí — bỏ mọi hạn mức trong 7 ngày', 'gia': '', 'nhan': 'Đang dùng'},
   {'ten': '30 ngày', 'moTa': 'Gói thuê bao 30 ngày', 'gia': '49.000đ', 'nhan': ''},
@@ -31,59 +33,74 @@ class Mh28DanhSachGoiScreen extends StatefulWidget {
 }
 
 class _Mh28DanhSachGoiScreenState extends State<Mh28DanhSachGoiScreen> {
-  int _goiChon = 2; // mac dinh chon goi 90 ngay nhu mockup
+  int _goiDaChon = 2; // mac dinh chon goi 90 ngay theo mockup
 
   @override
   Widget build(BuildContext context) {
-    final goi = _mockGoi[_goiChon];
+    final goi = _mockGoi[_goiDaChon];
     return Scaffold(
       appBar: AppBar(title: const Text('Gói thuê')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: Column(
         children: [
-          for (var i = 0; i < _mockGoi.length; i++)
-            _TheGoi(
-              goi: _mockGoi[i],
-              dangChon: _goiChon == i,
-              onTap: () => setState(() => _goiChon = i),
-            ),
-          const SizedBox(height: 8),
-          const Text('So sánh hạn mức', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 10),
-          const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(flex: 3, child: Text('Hạn mức', style: TextStyle(color: kTextSub, fontSize: 13))),
-                      Expanded(flex: 2, child: Text('Miễn phí', style: TextStyle(color: kTextSub, fontSize: 13))),
-                      Expanded(
-                        flex: 3,
-                        child: Text('Thuê bao', style: TextStyle(color: kPrimary, fontSize: 13, fontWeight: FontWeight.w700)),
-                      ),
-                    ],
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              children: [
+                for (var i = 0; i < _mockGoi.length; i++) _TheGoi(
+                  goi: _mockGoi[i],
+                  dangDung: i == 0,
+                  onTap: () => setState(() => _goiDaChon = i),
+                ),
+                const SizedBox(height: 6),
+                const Text('So sánh hạn mức', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 10),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            const Expanded(flex: 3, child: Text('Hạn mức', style: TextStyle(color: kTextSub))),
+                            const Expanded(flex: 2, child: Text('Miễn phí', style: TextStyle(color: kTextSub))),
+                            Expanded(
+                              flex: 2,
+                              child: Text('Thuê bao', style: TextStyle(color: kPrimary, fontWeight: FontWeight.w800)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        _DongSoSanh('Chủ đề', '1', 'Không giới hạn'),
+                        _DongSoSanh('Bộ đề/chủ đề', '2', 'Không giới hạn'),
+                        _DongSoSanh('Thành viên/chủ đề', '10', 'Không giới hạn'),
+                        _DongSoSanh('Câu hỏi', 'Không giới hạn', 'Không giới hạn'),
+                      ],
+                    ),
                   ),
-                  Divider(height: 20),
-                  _DongSoSanh('Chủ đề', '1'),
-                  _DongSoSanh('Bộ đề/chủ đề', '2'),
-                  _DongSoSanh('Thành viên/chủ đề', '10'),
-                  _DongSoSanh('Câu hỏi', 'Không giới hạn'),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _goiChon == 0 ? null : () => _xacNhanMoPhong(context, goi['ten']!),
-            child: Text(_goiChon == 0 ? 'Đang dùng gói dùng thử' : 'Đăng ký gói ${goi['ten']}'),
-          ),
-          const SizedBox(height: 10),
-          const Center(
-            child: Text(
-              'Thanh toán mô phỏng — không trừ tiền thật',
-              style: TextStyle(fontSize: 13, color: kTextSub),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Column(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _goiDaChon == 0
+                        ? null
+                        : () => _xacNhanMoPhong(context, goi['ten']!),
+                    child: Text(_goiDaChon == 0 ? 'Đang dùng gói này' : 'Đăng ký gói ${goi['ten']}'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Thanh toán mô phỏng — không trừ tiền thật',
+                  style: TextStyle(color: kTextSub, fontSize: 13),
+                ),
+                const SizedBox(height: 10),
+              ],
             ),
           ),
         ],
@@ -113,78 +130,89 @@ class _Mh28DanhSachGoiScreenState extends State<Mh28DanhSachGoiScreen> {
 
 class _TheGoi extends StatelessWidget {
   final Map<String, String> goi;
-  final bool dangChon;
+  final bool dangDung;
   final VoidCallback onTap;
 
-  const _TheGoi({required this.goi, required this.dangChon, required this.onTap});
+  const _TheGoi({required this.goi, required this.dangDung, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final nhan = goi['nhan']!;
-    final laPhoBien = nhan == 'Phổ biến nhất';
-    return Card(
+    final card = Card(
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: dangChon ? kPrimary : Colors.transparent, width: 1.6),
+        side: BorderSide(color: dangDung ? kPrimary : Colors.transparent, width: 2),
       ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(goi['ten']!, style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w800)),
-                  ),
-                  if (nhan.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: laPhoBien ? kWarning : kPrimary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        nhan,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: laPhoBien ? Colors.white : kPrimary,
-                        ),
-                      ),
-                    ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(goi['ten']!, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(goi['moTa']!, style: const TextStyle(color: kTextSub, fontSize: 13.5)),
+                  ],
+                ),
               ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(goi['moTa']!, style: const TextStyle(fontSize: 13, color: kTextSub)),
+              if (dangDung)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: kPrimary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  if (goi['gia']!.isNotEmpty)
-                    Text(
-                      goi['gia']!,
-                      style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w900, color: kPrimary),
-                    ),
-                ],
-              ),
+                  child: const Text('Đang dùng', style: TextStyle(color: kPrimary, fontWeight: FontWeight.w700)),
+                )
+              else
+                Text(
+                  goi['gia']!,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: kPrimary),
+                ),
             ],
           ),
         ),
       ),
     );
+    if (nhan == 'Phổ biến nhất') {
+      return Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            card,
+            Positioned(
+              top: -10,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: kTextMain,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text('Phổ biến nhất', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return card;
   }
 }
 
 class _DongSoSanh extends StatelessWidget {
   final String chiTieu;
   final String mienPhi;
+  final String thueBao;
 
-  const _DongSoSanh(this.chiTieu, this.mienPhi);
+  const _DongSoSanh(this.chiTieu, this.mienPhi, this.thueBao);
 
   @override
   Widget build(BuildContext context) {
@@ -194,9 +222,9 @@ class _DongSoSanh extends StatelessWidget {
         children: [
           Expanded(flex: 3, child: Text(chiTieu)),
           Expanded(flex: 2, child: Text(mienPhi, style: const TextStyle(color: kTextSub))),
-          const Expanded(
-            flex: 3,
-            child: Text('Không giới hạn', style: TextStyle(color: kSuccess, fontWeight: FontWeight.w600)),
+          Expanded(
+            flex: 2,
+            child: Text(thueBao, style: const TextStyle(fontWeight: FontWeight.w700, color: kSuccess)),
           ),
         ],
       ),

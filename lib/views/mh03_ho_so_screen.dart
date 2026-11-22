@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
+import '../core/uy_theme.dart';
 import '../routes.dart';
 
 // ============================================================
@@ -27,7 +28,7 @@ const _mockHoSo = {
   'diemTrungBinh': 8.2,
   'luotLam': 17,
   'tranThang': 6,
-  'goiHienTai': 'Dùng thử — còn 5 ngày',
+  'goiHienTai': 'Dùng thử — còn 7 ngày',
 };
 
 class Mh03HoSoScreen extends StatefulWidget {

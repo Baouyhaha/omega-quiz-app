@@ -1,20 +1,34 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
+import '../core/uy_theme.dart';
 import '../widgets/nut_chinh_widget.dart';
 
 // ============================================================
 // MH-16 — Đối kháng 1-1
 // Luồng: L6 (Đối kháng 1-1)
-// Vào từ: tab "Thi đấu" của khung điều hướng
-// Đi tới: MH-09 (màn thi đấu dùng chung khung MH-09 + panel đối thủ)
-// Bố cục: dựng theo mockup Figma MH-16-doi-khang-1-1 — mockup vẽ
-//         nối tiếp các trạng thái trên cùng một màn: chọn chủ đề,
-//         mã phòng, chờ đối thủ, trạng thái người chơi
-// Dữ liệu giả: chủ đề Toán cao cấp, mã phòng X7K2P9 ở dưới đây
+// Vào từ: màn đợt thi MH-17 (tab Thi đấu), bấm vào mục đối kháng
+//         — KHÔNG phải màn gốc của tab Thi đấu
+// Đi tới: MH-09 (màn thi đấu dùng chung khung làm bài + panel đối thủ)
+// Bố cục: dựng theo mockup Figma MH-16-doi-khang-1-1 (thẻ chủ đề đã
+//         chọn, nút Tạo phòng, thẻ mã phòng, thẻ chờ đối thủ,
+//         thẻ người chơi có tiến trình đối thủ)
+// Dữ liệu giả: khối _mockPhong ngay dưới đây
 // Chức năng thật nối ở: T27 (phòng realtime, rút câu ngẫu nhiên
 //             từ kho chủ đề ở máy chủ)
 // ============================================================
+
+// MOCK: phong doi khang mau
+const _mockPhong = {
+  'chuDe': 'Toán cao cấp',
+  'maPhong': 'X7K2P9',
+  'tenNguoiChoi': 'Uy',
+  'hang': 'Ngựa',
+  'diemRank': 1240,
+  'cauDoiThuDaLam': 5,
+  'tongCau': 20,
+};
+
 class Mh16DoiKhangScreen extends StatelessWidget {
   const Mh16DoiKhangScreen({super.key});
 
@@ -35,13 +49,16 @@ class Mh16DoiKhangScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Chủ đề đã chọn', style: TextStyle(fontSize: 13, color: kTextSub)),
-                        SizedBox(height: 4),
+                        SizedBox(height: 2),
                         Text('Toán cao cấp', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
                       ],
                     ),
                   ),
                   OutlinedButton(
-                    style: OutlinedButton.styleFrom(minimumSize: const Size(72, 40)),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(64, 38),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                    ),
                     onPressed: () {},
                     child: const Text('Đổi'),
                   ),
@@ -50,7 +67,14 @@ class Mh16DoiKhangScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          NutChinh(text: 'Tạo phòng', onPressed: () {}),
+          NutChinh(
+            text: 'Tạo phòng',
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Bản giao diện: phòng đã tạo, mã X7K2P9.')),
+              );
+            },
+          ),
           const SizedBox(height: 12),
           Card(
             child: Padding(
@@ -62,16 +86,19 @@ class Mh16DoiKhangScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Mã phòng', style: TextStyle(fontSize: 13, color: kTextSub)),
-                        SizedBox(height: 4),
+                        SizedBox(height: 2),
                         Text(
                           'X7K2P9',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: kPrimary, letterSpacing: 1.5),
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: kPrimary, letterSpacing: 2),
                         ),
                       ],
                     ),
                   ),
                   OutlinedButton(
-                    style: OutlinedButton.styleFrom(minimumSize: const Size(110, 40)),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(64, 38),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                    ),
                     onPressed: () {},
                     child: const Text('Chia sẻ mã'),
                   ),
@@ -88,20 +115,29 @@ class Mh16DoiKhangScreen extends StatelessWidget {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.hourglass_empty_rounded, color: kPrimary, size: 26),
+                      SizedBox(
+                        width: 34,
+                        height: 34,
+                        child: CircularProgressIndicator(color: kPrimary, strokeWidth: 3),
+                      ),
                       SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Đang chờ đối thủ...', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                          SizedBox(height: 2),
-                          Text('Chia sẻ mã phòng cho bạn bè', style: TextStyle(fontSize: 13, color: kTextSub)),
-                        ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Đang chờ đối thủ…', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                            SizedBox(height: 2),
+                            Text('Chia sẻ mã phòng cho bạn bè', style: TextStyle(color: kTextSub)),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
-                  NutChinh(text: 'Mời bạn bè', onPressed: () {}),
+                  NutChinh(
+                    text: 'Mời bạn bè',
+                    onPressed: () {},
+                  ),
                 ],
               ),
             ),
@@ -116,9 +152,8 @@ class Mh16DoiKhangScreen extends StatelessWidget {
                   Row(
                     children: [
                       const CircleAvatar(
-                        radius: 22,
                         backgroundColor: kPrimary,
-                        child: Text('U', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Colors.white)),
+                        child: Text('U', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
@@ -126,8 +161,7 @@ class Mh16DoiKhangScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('Uy', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                            SizedBox(height: 2),
-                            Text('Hổ · 1250 điểm', style: TextStyle(fontSize: 13, color: kTextSub)),
+                            Text('Ngựa · 1240 điểm', style: TextStyle(color: kTextSub)),
                           ],
                         ),
                       ),
@@ -137,20 +171,22 @@ class Mh16DoiKhangScreen extends StatelessWidget {
                           color: kSuccess.withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Text(
-                          'Đã sẵn sàng',
-                          style: TextStyle(fontSize: 12.5, color: kSuccess, fontWeight: FontWeight.w700),
-                        ),
+                        child: const Text('Đã sẵn sàng', style: TextStyle(color: kSuccess, fontWeight: FontWeight.w700)),
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
-                  const Text('Đối thủ đã làm 5/20 câu', style: TextStyle(fontSize: 13, color: kTextSub)),
-                  const SizedBox(height: 6),
-                  const LinearProgressIndicator(
-                    value: 0.25,
+                  Text(
+                    'Đối thủ đã làm ${_mockPhong['cauDoiThuDaLam']}/${_mockPhong['tongCau']} câu',
+                    style: const TextStyle(color: kTextSub),
+                  ),
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: (_mockPhong['cauDoiThuDaLam'] as int) / (_mockPhong['tongCau'] as int),
                     color: kSuccess,
+                    backgroundColor: const Color(0xFFE7E3F5),
                     minHeight: 8,
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 ],
               ),
@@ -159,8 +195,7 @@ class Mh16DoiKhangScreen extends StatelessWidget {
           const SizedBox(height: 14),
           const Text(
             'Màn thi đấu dùng chung khung MH-09 + panel đối thủ',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.5, color: kTextSub),
+            style: TextStyle(color: kTextSub, fontSize: 13),
           ),
         ],
       ),

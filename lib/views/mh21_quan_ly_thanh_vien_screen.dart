@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
+import '../core/uy_theme.dart';
 import '../widgets/nut_chinh_widget.dart';
 
 // ============================================================
@@ -8,7 +9,9 @@ import '../widgets/nut_chinh_widget.dart';
 // Luồng: L4 (chủ sở hữu mời thành viên), L5 (trạng thái lời mời)
 // Vào từ: MH-06 (chi tiết chủ đề, nút Quản lý thành viên)
 // Đi tới: quay lại MH-06
-// Bố cục: dựng theo mockup Figma MH-21-quan-ly-thanh-vien
+// Bố cục: dựng theo mockup Figma MH-21-quan-ly-thanh-vien (ô mời
+//         email, nút Gửi lời mời, 2 mục Đã tham gia / Lời mời
+//         đang chờ kèm nút Xóa và nhãn Đang chờ)
 // Dữ liệu giả: _mockThanhVien + _mockLoiMoiCho ngay dưới đây
 // Chức năng thật nối ở: UC05–UC07 (mời qua email, hạn mức
 //             10 thành viên/chủ đề ở gói miễn phí)
@@ -16,8 +19,8 @@ import '../widgets/nut_chinh_widget.dart';
 
 // MOCK: thanh vien va loi moi cho cua chu de Toan cao cap
 const _mockThanhVien = [
-  {'ten': 'Uy', 'chuCai': 'U', 'ngay': '19/11', 'mau': kPrimary},
-  {'ten': 'Thịnh', 'chuCai': 'T', 'ngay': '20/11', 'mau': Color(0xFF118AB2)},
+  {'ten': 'Uy', 'ngay': 'Tham gia 19/11', 'chuCai': 'U', 'mau': 0xFF6C4CF1},
+  {'ten': 'Thịnh', 'ngay': 'Tham gia 20/11', 'chuCai': 'T', 'mau': 0xFF118AB2},
 ];
 const _mockLoiMoiCho = ['dinh@example.com'];
 
@@ -31,11 +34,10 @@ class Mh21QuanLyThanhVienScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text('Mời thành viên', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const Text('Mời thành viên', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
           const SizedBox(height: 10),
           const TextField(
-            maxLines: 2,
-            decoration: InputDecoration(hintText: 'Nhập email, mỗi email một dòng'),
+            decoration: InputDecoration(hintText: 'Nhập email, mời email một dòng'),
           ),
           const SizedBox(height: 12),
           NutChinh(
@@ -49,32 +51,30 @@ class Mh21QuanLyThanhVienScreen extends StatelessWidget {
           const SizedBox(height: 8),
           const Text(
             'Miễn phí: tối đa 10 thành viên/chủ đề',
-            style: TextStyle(fontSize: 13, color: kTextSub),
+            style: TextStyle(color: kTextSub, fontSize: 13),
           ),
           const SizedBox(height: 18),
-          Text(
-            'Đã tham gia (${_mockThanhVien.length})',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-          ),
+          Text('Đã tham gia (${_mockThanhVien.length})', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
           const SizedBox(height: 10),
           for (final tv in _mockThanhVien)
             Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: tv['mau'] as Color,
+                  backgroundColor: Color(tv['mau'] as int),
                   child: Text(
                     tv['chuCai'] as String,
-                    style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
                   ),
                 ),
-                title: Text(tv['ten'] as String, style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text('Tham gia ${tv['ngay']}'),
+                title: Text(tv['ten'] as String, style: const TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: Text(tv['ngay'] as String, style: const TextStyle(color: kTextSub)),
                 trailing: OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: kError,
                     side: const BorderSide(color: kError),
-                    minimumSize: const Size(64, 36),
+                    minimumSize: const Size(56, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                   ),
                   onPressed: () {},
                   child: const Text('Xóa'),
@@ -82,10 +82,7 @@ class Mh21QuanLyThanhVienScreen extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 10),
-          Text(
-            'Lời mời đang chờ (${_mockLoiMoiCho.length})',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-          ),
+          Text('Lời mời đang chờ (${_mockLoiMoiCho.length})', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
           const SizedBox(height: 10),
           for (final email in _mockLoiMoiCho)
             Card(
@@ -95,13 +92,10 @@ class Mh21QuanLyThanhVienScreen extends StatelessWidget {
                 trailing: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: kWarning.withValues(alpha: 0.16),
+                    color: kWarning.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text(
-                    'Đang chờ',
-                    style: TextStyle(fontSize: 12.5, color: Color(0xFFB97E0B), fontWeight: FontWeight.w700),
-                  ),
+                  child: const Text('Đang chờ', style: TextStyle(color: Color(0xFF8A6D00), fontWeight: FontWeight.w700)),
                 ),
               ),
             ),
