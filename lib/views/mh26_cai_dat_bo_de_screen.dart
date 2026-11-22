@@ -33,7 +33,7 @@ class _Mh26CaiDatBoDeScreenState extends State<Mh26CaiDatBoDeScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Row(
+          Row(
             children: [
               Expanded(
                 child: TextFormField(
@@ -53,7 +53,7 @@ class _Mh26CaiDatBoDeScreenState extends State<Mh26CaiDatBoDeScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          const Row(
+          Row(
             children: [
               Expanded(
                 child: TextFormField(
