@@ -10,6 +10,11 @@ Nhóm Omega:
 
 Làm việc trên nhánh của mình, xong mở PR vào `main`, không push thẳng lên main.
 
+Môi trường dùng chung (không tự ý thay đổi):
+- Flutter SDK **3.50.0** (kênh stable) trên cả 4 máy — nhóm đã cập nhật đồng loạt ngày 13/11/2026.
+- Viết code bằng VS Code; chạy máy ảo bằng Android Studio (Pixel 6, API 37).
+- Hướng dẫn Git: xem `docs/HUONG_DAN_GIT.md`.
+
 Chạy thử:
 
 ```
