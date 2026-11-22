@@ -76,11 +76,11 @@ class _Mh25TaoSuaBoDeScreenState extends State<Mh25TaoSuaBoDeScreen> {
                 if (_cachTao == 0) ...[
                   const Row(
                     children: [
-                      Expanded(child: _O SoLuong(nhan: 'Dễ', giaTri: '8', mauSo: kSuccess)),
+                      Expanded(child: _OSoLuong(nhan: 'Dễ', giaTri: '8', mauSo: kSuccess)),
                       SizedBox(width: 10),
-                      Expanded(child: _O SoLuong(nhan: 'Trung bình', giaTri: '8', mauSo: Color(0xFFEF8A2A))),
+                      Expanded(child: _OSoLuong(nhan: 'Trung bình', giaTri: '8', mauSo: Color(0xFFEF8A2A))),
                       SizedBox(width: 10),
-                      Expanded(child: _O SoLuong(nhan: 'Khó', giaTri: '4', mauSo: kError)),
+                      Expanded(child: _OSoLuong(nhan: 'Khó', giaTri: '4', mauSo: kError)),
                     ],
                   ),
                   const SizedBox(height: 18),
