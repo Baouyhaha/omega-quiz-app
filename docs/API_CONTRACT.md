@@ -75,7 +75,7 @@ Khi lỗi: `"success": false`, `"data": null`, `message` là thông điệp ngư
 | POST | `exams/{id}/attempts` | Bắt đầu lượt làm: kiểm tra khung giờ, PIN (body `{ "pin": "..." }` nếu có), số lần làm → trả `attemptId` + danh sách câu hỏi (không đáp án) |
 | POST | `attempts/{id}/helpers` | Dùng quyền trợ giúp: `{ "type": "FIFTY_FIFTY" \| "LIGHT_HINT" \| "VIEW_EXPLANATION" \| "CHANGE_QUESTION" \| "EXTRA_TIME" \| "SAFE_SHIELD", "questionId": "..." }` |
 | POST | `attempts/{id}/violations` | Báo một lần thoát app giữa chừng → trả số lần vi phạm; đủ 5 lần máy chủ tự nộp bài |
-| POST | `attempts/{id}/submit` | Nộp bài: `{ "answers": [{ "questionId": "...", "selectedOption": 0 }], "durationSeconds": 742 }` → máy chủ chấm (điểm gốc + thưởng tốc độ), trả kết quả |
+| POST | `attempts/{id}/submit` | Nộp bài: `{ "answers": [{ "questionId": "...", "selectedOption": 0, "timeSpentSeconds": 12 }], "durationSeconds": 742 }` → máy chủ chấm (điểm gốc + thưởng tốc độ), trả kết quả. `timeSpentSeconds` là tùy chọn: thời gian làm từng câu, dùng để tính thưởng tốc độ theo từng câu đúng công thức Đợt 2; không gửi thì tính theo tỷ lệ tổng thời gian |
 | GET | `attempts/mine` | Lịch sử làm bài của tôi |
 | GET | `attempts/{id}/review` | Xem lại bài: đáp án đúng + giải thích (chỉ khi cài đặt bộ đề cho phép) |
 | GET | `reviews/wrong` | Danh sách câu tôi từng làm sai (ôn tập) |
