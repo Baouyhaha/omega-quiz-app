@@ -8,7 +8,10 @@ import '../widgets/nut_chinh_widget.dart';
 // MH-25 — Tạo/Sửa bộ đề (chủ sở hữu chủ đề)
 // Luồng: L4 (chủ sở hữu tạo nội dung)
 // Vào từ: MH-07 (danh sách bộ đề, nút Tạo bộ đề) / MH-08 (Sửa)
-// Đi tới: MH-26 (cài đặt bộ đề) sau khi tạo xong phần nội dung
+// Đi tới: MH-26 (cài đặt bộ đề) sau khi bấm "Tạo bộ đề"
+// Bố cục: dựng theo mockup Figma MH-25-tao-sua-bo-de (2 thẻ radio
+//         chọn cách tạo; 3 ô số câu Dễ/Trung bình/Khó khi trích
+//         ngẫu nhiên; ghép thủ công thì hiện danh sách câu hỏi)
 // Dữ liệu giả: _mockCauHoi ngay dưới đây
 // Chức năng thật nối ở: T20 (tạo bộ đề: ghép thủ công hoặc
 //             trích ngẫu nhiên theo mức độ)
@@ -31,7 +34,7 @@ class Mh25TaoSuaBoDeScreen extends StatefulWidget {
 }
 
 class _Mh25TaoSuaBoDeScreenState extends State<Mh25TaoSuaBoDeScreen> {
-  // 0: ghep thu cong, 1: trich ngau nhien
+  // 0: trich ngau nhien, 1: ghep thu cong (theo thu tu tren mockup)
   int _cachTao = 0;
   final Set<int> _cauDaChon = {0, 1};
 
@@ -42,29 +45,46 @@ class _Mh25TaoSuaBoDeScreenState extends State<Mh25TaoSuaBoDeScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const TextField(
-            decoration: InputDecoration(labelText: 'Tên bộ đề', hintText: 'Ví dụ: Bộ đề ôn tập chương 1'),
+          const Text('Tên bộ đề', style: TextStyle(fontSize: 13, color: kTextSub)),
+          const SizedBox(height: 6),
+          TextFormField(initialValue: 'Giữa kỳ — Đạo hàm'),
+          const SizedBox(height: 18),
+          const Text('Cách tạo bộ đề', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 10),
+          _TheCachTao(
+            giaTri: 0,
+            tieuDe: 'Trích ngẫu nhiên',
+            moTa: 'Rút câu theo mức độ từ kho câu hỏi',
           ),
-          const SizedBox(height: 12),
-          const TextField(
-            maxLines: 2,
-            decoration: InputDecoration(labelText: 'Mô tả (không bắt buộc)'),
-          ),
-          const SizedBox(height: 16),
-          const Text('Cách tạo bộ đề', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: _TheCachTao(0, Icons.checklist_rounded, 'Ghép thủ công', 'Tự chọn từng câu')),
-              const SizedBox(width: 10),
-              Expanded(child: _TheCachTao(1, Icons.shuffle_rounded, 'Trích ngẫu nhiên', 'Chọn theo mức độ')),
-            ],
+          const SizedBox(height: 10),
+          _TheCachTao(
+            giaTri: 1,
+            tieuDe: 'Ghép thủ công',
+            moTa: 'Tự chọn từng câu trong kho',
           ),
           const SizedBox(height: 16),
           if (_cachTao == 0) ...[
+            Row(
+              children: [
+                Expanded(child: _OSoLuong(nhan: 'Dễ', giaTri: '8', mau: kSuccess)),
+                const SizedBox(width: 10),
+                Expanded(child: _OSoLuong(nhan: 'Trung bình', giaTri: '8', mau: kWarning)),
+                const SizedBox(width: 10),
+                Expanded(child: _OSoLuong(nhan: 'Khó', giaTri: '4', mau: kError)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Center(
+              child: Text('Tổng: 20 câu', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+            ),
+            const SizedBox(height: 4),
+            const Center(
+              child: Text('Câu hỏi được rút ngẫu nhiên từ kho', style: TextStyle(fontSize: 13, color: kTextSub)),
+            ),
+          ] else ...[
             Text(
               'Chọn câu hỏi (đã chọn ${_cauDaChon.length}/${_mockCauHoi.length})',
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
             ),
             const SizedBox(height: 8),
             for (var i = 0; i < _mockCauHoi.length; i++)
@@ -83,25 +103,10 @@ class _Mh25TaoSuaBoDeScreenState extends State<Mh25TaoSuaBoDeScreen> {
                   subtitle: Text('Mức độ: ${_mockCauHoi[i]['mucDo']}'),
                 ),
               ),
-          ] else ...[
-            const Text('Số câu theo mức độ', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-            const SizedBox(height: 8),
-            const Row(
-              children: [
-                Expanded(child: _OSoLuong(nhan: 'Dễ', giaTri: '8')),
-                SizedBox(width: 10),
-                Expanded(child: _OSoLuong(nhan: 'Trung bình', giaTri: '7')),
-                SizedBox(width: 10),
-                Expanded(child: _OSoLuong(nhan: 'Khó', giaTri: '5')),
-              ],
-            ),
-            const SizedBox(height: 10),
-            const Text('Tổng: 20 câu', style: TextStyle(color: kTextSub)),
           ],
           const SizedBox(height: 24),
           NutChinh(
-            text: 'Tiếp tục: Cài đặt bộ đề',
-            icon: Icons.settings_rounded,
+            text: 'Tạo bộ đề',
             onPressed: () => Navigator.pushNamed(context, AppRoutes.mh26),
           ),
         ],
@@ -109,25 +114,33 @@ class _Mh25TaoSuaBoDeScreenState extends State<Mh25TaoSuaBoDeScreen> {
     );
   }
 
-  Widget _TheCachTao(int giaTri, IconData icon, String tieuDe, String moTa) {
+  Widget _TheCachTao({required int giaTri, required String tieuDe, required String moTa}) {
     final dangChon = _cachTao == giaTri;
     return InkWell(
       onTap: () => setState(() => _cachTao = giaTri),
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: dangChon ? kPrimary : Colors.transparent, width: 2),
+          border: Border.all(color: dangChon ? kPrimary : Colors.transparent, width: 1.6),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Icon(icon, color: dangChon ? kPrimary : kTextSub),
-            const SizedBox(height: 8),
-            Text(tieuDe, style: const TextStyle(fontWeight: FontWeight.w800)),
-            Text(moTa, style: const TextStyle(fontSize: 12, color: kTextSub)),
+            Icon(
+              dangChon ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+              color: dangChon ? kPrimary : kTextSub,
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tieuDe, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
+                Text(moTa, style: const TextStyle(fontSize: 13, color: kTextSub)),
+              ],
+            ),
           ],
         ),
       ),
@@ -138,16 +151,32 @@ class _Mh25TaoSuaBoDeScreenState extends State<Mh25TaoSuaBoDeScreen> {
 class _OSoLuong extends StatelessWidget {
   final String nhan;
   final String giaTri;
+  final Color mau;
 
-  const _OSoLuong({required this.nhan, required this.giaTri});
+  const _OSoLuong({required this.nhan, required this.giaTri, required this.mau});
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
-      initialValue: giaTri,
-      keyboardType: TextInputType.number,
-      textAlign: TextAlign.center,
-      decoration: InputDecoration(labelText: nhan),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        children: [
+          Text(nhan, style: const TextStyle(fontSize: 13, color: kTextSub)),
+          const SizedBox(height: 4),
+          TextFormField(
+            initialValue: giaTri,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: mau),
+            decoration: const InputDecoration(
+              filled: false,
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

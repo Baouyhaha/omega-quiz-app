@@ -2,35 +2,21 @@ import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
 import '../widgets/nut_chinh_widget.dart';
-import '../widgets/trang_thai_tai_widget.dart';
 
 // ============================================================
 // MH-16 — Đối kháng 1-1
 // Luồng: L6 (Đối kháng 1-1)
-// Vào từ: tab "Thi đấu" của khung điều hướng / nút Thi đấu ở MH-02
-// Đi tới: MH-09 (màn làm bài dùng chung khi trận bắt đầu)
-// Dữ liệu giả: _mockChuDe ngay dưới đây; trạng thái phòng đổi bằng
-//             setState để xem trước giao diện, chưa nối Firestore
+// Vào từ: tab "Thi đấu" của khung điều hướng
+// Đi tới: MH-09 (màn thi đấu dùng chung khung MH-09 + panel đối thủ)
+// Bố cục: dựng theo mockup Figma MH-16-doi-khang-1-1 — mockup vẽ
+//         nối tiếp các trạng thái trên cùng một màn: chọn chủ đề,
+//         mã phòng, chờ đối thủ, trạng thái người chơi
+// Dữ liệu giả: chủ đề Toán cao cấp, mã phòng X7K2P9 ở dưới đây
 // Chức năng thật nối ở: T27 (phòng realtime, rút câu ngẫu nhiên
 //             từ kho chủ đề ở máy chủ)
 // ============================================================
-
-// MOCK: danh sach chu de de chon thi dau
-const _mockChuDe = ['Toán cao cấp', 'Tiếng Anh'];
-const _mockSoCau = [5, 10, 15, 20];
-
-class Mh16DoiKhangScreen extends StatefulWidget {
+class Mh16DoiKhangScreen extends StatelessWidget {
   const Mh16DoiKhangScreen({super.key});
-
-  @override
-  State<Mh16DoiKhangScreen> createState() => _Mh16DoiKhangScreenState();
-}
-
-class _Mh16DoiKhangScreenState extends State<Mh16DoiKhangScreen> {
-  String _chuDe = _mockChuDe.first;
-  int _soCau = 10;
-  // 0: dang chon, 1: dang cho doi thu, 2: doi thu da vao, cho san sang
-  int _trangThaiPhong = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -39,117 +25,143 @@ class _Mh16DoiKhangScreenState extends State<Mh16DoiKhangScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'Câu hỏi được rút ngẫu nhiên từ kho câu hỏi của chủ đề. '
-            'Hai người làm cùng một danh sách câu, thắng +15 điểm rank.',
-            style: TextStyle(color: kTextSub, height: 1.45),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Chủ đề đã chọn', style: TextStyle(fontSize: 13, color: kTextSub)),
+                        SizedBox(height: 4),
+                        Text('Toán cao cấp', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                  ),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(minimumSize: const Size(72, 40)),
+                    onPressed: () {},
+                    child: const Text('Đổi'),
+                  ),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
-          if (_trangThaiPhong == 0) ...[
-            const Text('Chọn chủ đề', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final cd in _mockChuDe)
-                  ChoiceChip(
-                    label: Text(cd),
-                    selected: _chuDe == cd,
-                    onSelected: (_) => setState(() => _chuDe = cd),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Text('Số câu hỏi', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final n in _mockSoCau)
-                  ChoiceChip(
-                    label: Text('$n câu'),
-                    selected: _soCau == n,
-                    onSelected: (_) => setState(() => _soCau = n),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            NutChinh(
-              text: 'Tạo phòng',
-              icon: Icons.add_circle_rounded,
-              onPressed: () => setState(() => _trangThaiPhong = 1),
-            ),
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 12),
-            const Text('Vào phòng bằng mã', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-            const SizedBox(height: 8),
-            const TextField(
-              decoration: InputDecoration(hintText: 'Nhập mã phòng, ví dụ X7K2'),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: () => setState(() => _trangThaiPhong = 2),
-              child: const Text('Vào phòng'),
-            ),
-          ] else if (_trangThaiPhong == 1) ...[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    const Text('Mã phòng của bạn', style: TextStyle(color: kTextSub)),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'X7K2',
-                      style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, letterSpacing: 4, color: kPrimary),
+          const SizedBox(height: 12),
+          NutChinh(text: 'Tạo phòng', onPressed: () {}),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Mã phòng', style: TextStyle(fontSize: 13, color: kTextSub)),
+                        SizedBox(height: 4),
+                        Text(
+                          'X7K2P9',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: kPrimary, letterSpacing: 1.5),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text('Chủ đề: $_chuDe · $_soCau câu', style: const TextStyle(color: kTextSub)),
-                  ],
-                ),
+                  ),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(minimumSize: const Size(110, 40)),
+                    onPressed: () {},
+                    child: const Text('Chia sẻ mã'),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 20),
-            const TrangThaiTai(text: 'Đang chờ đối thủ vào phòng…'),
-            const SizedBox(height: 20),
-            OutlinedButton(
-              onPressed: () => setState(() => _trangThaiPhong = 0),
-              child: const Text('Hủy phòng'),
-            ),
-          ] else ...[
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Đối thủ đã vào phòng', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                    const SizedBox(height: 8),
-                    const ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(
-                        backgroundColor: kPrimary,
-                        child: Icon(Icons.person_rounded, color: Colors.white),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.hourglass_empty_rounded, color: kPrimary, size: 26),
+                      SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Đang chờ đối thủ...', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                          SizedBox(height: 2),
+                          Text('Chia sẻ mã phòng cho bạn bè', style: TextStyle(fontSize: 13, color: kTextSub)),
+                        ],
                       ),
-                      title: Text('Đặng Ngọc Đỉnh'),
-                      subtitle: Text('Hạng Hổ · 1520 điểm rank'),
-                    ),
-                    const SizedBox(height: 8),
-                    NutChinh(
-                      text: 'Sẵn sàng',
-                      icon: Icons.check_circle_rounded,
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Bản giao diện: khi cả hai sẵn sàng sẽ chuyển sang màn làm bài MH-09.')),
-                        );
-                      },
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  NutChinh(text: 'Mời bạn bè', onPressed: () {}),
+                ],
               ),
             ),
-          ],
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 22,
+                        backgroundColor: kPrimary,
+                        child: Text('U', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: Colors.white)),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Uy', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                            SizedBox(height: 2),
+                            Text('Hổ · 1250 điểm', style: TextStyle(fontSize: 13, color: kTextSub)),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: kSuccess.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'Đã sẵn sàng',
+                          style: TextStyle(fontSize: 12.5, color: kSuccess, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  const Text('Đối thủ đã làm 5/20 câu', style: TextStyle(fontSize: 13, color: kTextSub)),
+                  const SizedBox(height: 6),
+                  const LinearProgressIndicator(
+                    value: 0.25,
+                    color: kSuccess,
+                    minHeight: 8,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Màn thi đấu dùng chung khung MH-09 + panel đối thủ',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, color: kTextSub),
+          ),
         ],
       ),
     );
