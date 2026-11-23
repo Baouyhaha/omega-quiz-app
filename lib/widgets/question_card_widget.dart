@@ -10,12 +10,27 @@ import 'difficulty_filter_chip_widget.dart';
 // noi dung xem truoc 13px #6E6A8A. The khong co interaction
 // trong task nen khong gan dieu huong — de giai doan chuc nang
 // moi noi bam the de sua cau hoi.
+// Trang thai chon nhieu (them sau task): hien o tick 22x22 o
+// ben trai, noi dung dich sang phai; o duoc tick to mau tim
+// chu dao kPrimary, vien the doi sang tim.
 // Dat trong lib/widgets/ theo quy tac chung.
 class QuestionCard extends StatelessWidget {
-  const QuestionCard({super.key, required this.question});
+  const QuestionCard({
+    super.key,
+    required this.question,
+    this.selecting = false,
+    this.selected = false,
+  });
 
   /// Cau hoi hien thi, lay tu file mock.
   final MockQuestion question;
+
+  /// true = MH-22 đang ở trạng thái chọn nhiều: hiện ô tick
+  /// ở bên trái, nội dung dịch sang phải.
+  final bool selecting;
+
+  /// true = thẻ này đang được chọn (ô tick tô màu tím chủ đạo).
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -25,12 +40,42 @@ class QuestionCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 15, 16, 15),
       decoration: BoxDecoration(
         color: kSurface,
-        border: Border.all(color: kInputBorder, width: 1),
+        border: Border.all(
+          color: selected ? kPrimary : kInputBorder,
+          width: selected ? 1.5 : 1,
+        ),
         borderRadius: BorderRadius.circular(kRadiusItem),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Ô tick chọn (chỉ ở trạng thái chọn nhiều): 22x22,
+          // chưa chọn viền #C9C4DE, đã chọn tô tím chủ đạo
+          // kPrimary + dấu tick trắng. Nội dung "Câu n" và
+          // mô tả dịch sang phải theo ô này.
+          if (selecting) ...[
+            Container(
+              width: 22,
+              height: 22,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: selected ? kPrimary : kSurface,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: selected ? kPrimary : kRadioBorder,
+                  width: 2,
+                ),
+              ),
+              child: selected
+                  ? const Icon(
+                      Icons.check,
+                      size: 14,
+                      color: kOnPrimary,
+                    )
+                  : null,
+            ),
+            const SizedBox(width: 10),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

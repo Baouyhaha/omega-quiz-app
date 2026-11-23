@@ -34,9 +34,11 @@ class DinhPreviewApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: buildDinhTheme(),
-      // Chay thu thang MH-33. Muon chay thu tu MH-30 thi doi home
-      // thanh Mh30AdminTaiKhoanScreen() (bam the Danh sang MH-31).
-      home: Mh33AdminThongKeScreen(),
+      // Chay thu thang MH-22 de test T18 (noi API that): danh sach
+      // cau hoi cua chu de Tieng Anh (topic_anh) lay tu API cua Uy.
+      // Muon chay thu tu MH-30 thi doi home thanh
+      // Mh30AdminTaiKhoanScreen() (bam the Danh sang MH-31).
+      home: Mh22QuanLyCauHoiScreen(),
       routes: {
         '/mh20': (context) => const Mh20TaoSuaChuDeScreen(),
         // Che do sua, dung chung form MH-20.

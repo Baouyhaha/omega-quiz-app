@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../core/dinh_api.dart';
 import '../core/dinh_theme.dart';
 import '../widgets/difficulty_filter_chip_widget.dart';
 import '../widgets/question_card_widget.dart';
 import 'mh22_quan_ly_cau_hoi_mock.dart';
+import 'mh23_soan_sua_cau_hoi_screen.dart';
 
 // ============================================================================
 // Mã MH: MH-22 — Quản lý câu hỏi
@@ -16,20 +18,28 @@ import 'mh22_quan_ly_cau_hoi_mock.dart';
 // Từ màn hình này đi tiếp tới những màn hình nào:
 //   - Bấm "Import Excel" -> MH-24 Import Excel (đích theo task).
 //   - Bấm "+ Thêm câu hỏi" -> MH-23 Soạn/Sửa câu hỏi (đích theo task).
-//   - Thẻ câu hỏi: không có interaction trong task, bấm chưa đi đâu.
-//   - Thẻ AI: không có interaction trong task (trạng thái "Sắp có").
+//   - Bấm thẻ câu hỏi -> MH-23 chế độ Sửa (nối ở T18 bước 2).
+//   - Bấm giữ thẻ câu hỏi -> vào trạng thái chọn nhiều: bấm
+//     thêm thẻ để chọn/bỏ chọn, nút Xóa ở thanh dưới xóa các
+//     câu đã chọn qua API #19, nút Hủy thoát trạng thái chọn.
+//     Hàng "Chọn tất cả" chỉ chọn các câu đang hiện trên màn
+//     hình (đã lọc độ khó/tìm kiếm) — xóa chỉ ảnh hưởng nhóm đó.
 //   - Nút quay lại "<" -> quay về màn hình trước.
 //   - Bottom nav (đích theo task):
 //     Trang chủ -> MH-02, Chủ đề -> đang ở đây,
 //     Thi đấu -> MH-17, Xếp hạng -> MH-14, Hồ sơ -> MH-03.
-// Dữ liệu giả đang dùng ở đâu:
-//   - File mh22_quan_ly_cau_hoi_mock.dart, biến mockQuestions
-//     (3 câu theo task) và mockTopicTitle ("Toán cao cấp").
-//   - Khối dữ liệu đó có ghi chú // MOCK: ở dòng đầu.
+// Dữ liệu đang dùng ở đâu:
+//   - T18 bước 2: danh sách câu hỏi thật lấy qua DinhApi.fetchQuestions
+//     (#16 GET /topics/:id/questions) của chủ đề topic_anh (Tiếng Anh,
+//     thuộc về dev:dinh). File mock mh22_quan_ly_cau_hoi_mock.dart chỉ
+//     còn dùng kiểu MockQuestion/MockDifficulty để vẽ thẻ QuestionCard.
+//   - Lọc theo tab độ khó + ô tìm kiếm lọc ở phía app (theo nội dung).
+//   - Ô tìm kiếm là phần thêm theo thẻ T18 bước 2, không có trong Figma.
 // Chức năng thật sẽ nối ở task nào:
-//   - Để giai đoạn chức năng: lấy danh sách câu hỏi thật qua API,
-//     lọc theo độ khó thật, import Excel thật, thêm/sửa câu hỏi thật.
-//     Kiến trúc: app gọi API, API mới qua Firebase.
+//   - T18 bước 2 (đã làm ở file này): GET #16, DELETE #19 (xóa
+//     1 câu từ MH-23 hoặc xóa nhiều câu đã chọn ở MH-22); MH-23
+//     nối POST #17/PATCH #18. Kiến trúc: app gọi API, API mới
+//     qua Firebase.
 //
 // SỐ ĐO: theo task MH-22, xem bảng
 // đầy đủ trong mh22_figma_tokens.md. Font Nunito, nền #F6F4FF,
@@ -42,7 +52,17 @@ import 'mh22_quan_ly_cau_hoi_mock.dart';
 /// Màn hình MH-22: danh sách câu hỏi của một chủ đề,
 /// kèm tab lọc theo độ khó và thẻ AI soạn nháp (Sắp có).
 class Mh22QuanLyCauHoiScreen extends StatefulWidget {
-  const Mh22QuanLyCauHoiScreen({super.key});
+  const Mh22QuanLyCauHoiScreen({
+    super.key,
+    this.topicId = 'topic_anh',
+    this.topicTitle = 'Tiếng Anh',
+  });
+
+  /// Id chủ đề lấy danh sách câu hỏi (mặc định topic_anh của dinh).
+  final String topicId;
+
+  /// Tên chủ đề hiện ở header.
+  final String topicTitle;
 
   @override
   State<Mh22QuanLyCauHoiScreen> createState() =>
@@ -58,14 +78,235 @@ class _Mh22QuanLyCauHoiScreenState extends State<Mh22QuanLyCauHoiScreen> {
   // thuộc luồng chủ đề.
   int _selectedIndex = 1;
 
-  /// Danh sách câu hỏi sau khi lọc theo tab đang chọn.
-  List<MockQuestion> get _visibleQuestions {
-    if (_selectedDifficulty == MockDifficulty.all) {
-      return mockQuestions;
+  /// Toàn bộ câu hỏi lấy từ API (#16).
+  List<ApiQuestion> _questions = [];
+
+  /// true = đang tải danh sách.
+  bool _loading = true;
+
+  /// Lỗi tải danh sách (null = không lỗi). Hiện kèm nút Thử lại.
+  String? _error;
+
+  /// Từ khóa tìm kiếm (lọc theo nội dung, không phân biệt hoa thường).
+  String _searchQuery = '';
+  late final TextEditingController _searchController;
+
+  /// Id các câu hỏi đang được chọn ở trạng thái chọn nhiều.
+  /// Tập rỗng = không ở trạng thái chọn.
+  final Set<String> _selectedIds = {};
+
+  /// true = đang ở trạng thái chọn nhiều (đã chọn ít nhất 1 câu).
+  bool get _selecting => _selectedIds.isNotEmpty;
+
+  /// true = đang chờ API xóa các câu đã chọn.
+  bool _deletingSelected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+    _loadQuestions();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  /// Tải danh sách câu hỏi của chủ đề qua API #16.
+  Future<void> _loadQuestions() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final questions =
+          await DinhApi.fetchQuestions(widget.topicId);
+      if (!mounted) return;
+      setState(() {
+        _questions = questions;
+        _loading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
     }
-    return mockQuestions
-        .where((q) => q.difficulty == _selectedDifficulty)
-        .toList();
+  }
+
+  /// Danh sách câu hỏi sau khi lọc theo tab độ khó + ô tìm kiếm.
+  List<ApiQuestion> get _visibleQuestions {
+    return _questions.where((q) {
+      if (_selectedDifficulty != MockDifficulty.all) {
+        final want = _selectedDifficulty == MockDifficulty.easy
+            ? 'easy'
+            : _selectedDifficulty == MockDifficulty.medium
+                ? 'medium'
+                : 'hard';
+        if (q.difficulty != want) return false;
+      }
+      if (_searchQuery.isNotEmpty) {
+        if (!q.content
+            .toLowerCase()
+            .contains(_searchQuery.toLowerCase())) {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
+  }
+
+  /// Mở MH-23 sửa câu hỏi. Lưu xong (trả về true) thì tải lại danh sách.
+  Future<void> _openEdit(ApiQuestion question) async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Mh23SoanSuaCauHoiScreen(
+          isEdit: true,
+          topicId: widget.topicId,
+          existing: question,
+        ),
+      ),
+    );
+    if (saved == true) _loadQuestions();
+  }
+
+  /// Mở MH-23 soạn câu hỏi mới. Lưu xong thì tải lại danh sách.
+  Future<void> _openCreate() async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Mh23SoanSuaCauHoiScreen(
+          topicId: widget.topicId,
+        ),
+      ),
+    );
+    if (saved == true) _loadQuestions();
+  }
+
+  /// Bấm giữ thẻ -> vào trạng thái chọn nhiều, chọn luôn thẻ đó.
+  void _enterSelection(ApiQuestion question) {
+    setState(() {
+      _selectedIds.add(question.id);
+    });
+  }
+
+  /// Bấm thẻ ở trạng thái chọn nhiều -> chọn/bỏ chọn thẻ đó.
+  /// Bỏ chọn câu cuối cùng thì tự thoát trạng thái chọn.
+  void _toggleSelect(ApiQuestion question) {
+    setState(() {
+      if (_selectedIds.contains(question.id)) {
+        _selectedIds.remove(question.id);
+      } else {
+        _selectedIds.add(question.id);
+      }
+    });
+  }
+
+  /// Nút Hủy ở thanh dưới -> thoát trạng thái chọn nhiều.
+  void _cancelSelection() {
+    setState(() {
+      _selectedIds.clear();
+    });
+  }
+
+  /// true = mọi câu hỏi đang hiện đều đã được chọn.
+  bool get _allVisibleSelected =>
+      _visibleQuestions.isNotEmpty &&
+      _visibleQuestions.every((q) => _selectedIds.contains(q.id));
+
+  /// "Chọn tất cả" / "Bỏ chọn tất cả": chỉ tác động các câu
+  /// hỏi ĐANG HIỆN trên màn hình (đã lọc theo tab độ khó +
+  /// ô tìm kiếm). Ví dụ lọc "Dễ" rồi chọn tất cả thì chỉ
+  /// chọn các câu dễ đang hiện — câu độ khó khác giữ nguyên.
+  void _toggleSelectAllVisible() {
+    setState(() {
+      if (_allVisibleSelected) {
+        for (final q in _visibleQuestions) {
+          _selectedIds.remove(q.id);
+        }
+      } else {
+        for (final q in _visibleQuestions) {
+          _selectedIds.add(q.id);
+        }
+      }
+    });
+  }
+
+  /// Nút Xóa ở thanh dưới -> hỏi xác nhận rồi xóa từng câu đã
+  /// chọn qua API #19, xong tải lại danh sách và thoát trạng
+  /// thái chọn.
+  Future<void> _deleteSelected() async {
+    if (_selectedIds.isEmpty || _deletingSelected) return;
+    final count = _selectedIds.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Xóa $count câu hỏi đã chọn?'),
+        content: const Text(
+          'Các câu hỏi đã chọn sẽ bị xóa khỏi chủ đề và không khôi phục được.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Xóa',
+              style: TextStyle(color: kHard),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() {
+      _deletingSelected = true;
+    });
+    var failed = 0;
+    for (final id in _selectedIds.toList()) {
+      try {
+        await DinhApi.deleteQuestion(id);
+      } on ApiException {
+        failed++;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _selectedIds.clear();
+      _deletingSelected = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          failed == 0
+              ? 'Đã xóa $count câu hỏi'
+              : 'Đã xóa ${count - failed}/$count câu hỏi ($failed câu lỗi)',
+        ),
+      ),
+    );
+    _loadQuestions();
+  }
+
+  /// Đổi ApiQuestion sang MockQuestion để vẽ thẻ QuestionCard
+  /// (thẻ chỉ cần số thứ tự, nội dung xem trước và độ khó).
+  MockQuestion _toMockQuestion(ApiQuestion q) {
+    final index = _questions.indexOf(q);
+    final difficulty = q.difficulty == 'easy'
+        ? MockDifficulty.easy
+        : q.difficulty == 'hard'
+            ? MockDifficulty.hard
+            : MockDifficulty.medium;
+    return MockQuestion(
+      number: index + 1,
+      preview: q.content,
+      difficulty: difficulty,
+    );
   }
 
   @override
@@ -88,14 +329,27 @@ class _Mh22QuanLyCauHoiScreenState extends State<Mh22QuanLyCauHoiScreen> {
               child: Row(
                 children: [
                   GestureDetector(
-                    // Quay về màn hình trước đó.
-                    onTap: () => Navigator.pop(context),
+                    // Ở trạng thái chọn nhiều: nút quay lại thoát
+                    // trạng thái chọn; bình thường: quay về màn trước.
+                    onTap: () {
+                      if (_selecting) {
+                        _cancelSelection();
+                      } else {
+                        Navigator.pop(context);
+                      }
+                    },
                     child: const Text('‹', style: kBackStyle),
                   ),
                   const SizedBox(width: 22),
-                  Text(
-                    'Câu hỏi — $mockTopicTitle',
-                    style: kPageTitleStyle,
+                  Expanded(
+                    child: Text(
+                      _selecting
+                          ? 'Đã chọn ${_selectedIds.length}'
+                          : 'Câu hỏi — ${widget.topicTitle}',
+                      style: kPageTitleStyle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -110,8 +364,38 @@ class _Mh22QuanLyCauHoiScreenState extends State<Mh22QuanLyCauHoiScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Đáy tiêu đề -> hàng tab: 35px.
-                    const SizedBox(height: 23),
+                    // Ô tìm kiếm (thêm theo thẻ T18 bước 2,
+                    // không có trong Figma): lọc theo nội dung.
+                    SizedBox(
+                      height: kFieldHeight,
+                      child: TextField(
+                        controller: _searchController,
+                        style: kFieldTextStyle,
+                        decoration: InputDecoration(
+                          hintText: 'Tìm câu hỏi...',
+                          hintStyle: kFieldTextStyle.copyWith(
+                            color: kNavUnselected,
+                          ),
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            color: kTextSecondary,
+                          ),
+                          filled: true,
+                          fillColor: kSurface,
+                          border: kFieldBorder,
+                          enabledBorder: kFieldBorder,
+                          focusedBorder: kFieldFocusedBorder,
+                          contentPadding: kFieldPadding,
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value.trim();
+                          });
+                        },
+                      ),
+                    ),
+                    // Ô tìm kiếm -> hàng tab: 14px.
+                    const SizedBox(height: 14),
                     // Hàng tab lọc độ khó, cao 28px.
                     // Khoảng cách giữa các pill theo task: 10, 10, 2.
                     Row(
@@ -189,10 +473,7 @@ class _Mh22QuanLyCauHoiScreenState extends State<Mh22QuanLyCauHoiScreen> {
                           child: SizedBox(
                             height: kButtonHeight,
                             child: ElevatedButton(
-                            onPressed: () {
-                              // Đích theo task: MH-23 Soạn/Sửa câu hỏi.
-                              Navigator.pushNamed(context, '/mh23');
-                            },
+                            onPressed: _openCreate,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: kPrimary,
                               foregroundColor: kOnPrimary,
@@ -214,13 +495,111 @@ class _Mh22QuanLyCauHoiScreenState extends State<Mh22QuanLyCauHoiScreen> {
                     // Hàng nút -> thẻ đầu tiên: 16px.
                     const SizedBox(height: 16),
 
-                    // Danh sách thẻ câu hỏi, thẻ cách nhau 12px.
-                    ..._visibleQuestions.map(
-                      (question) => Padding(
+                    // Hàng "Chọn tất cả" (chỉ ở trạng thái chọn
+                    // nhiều): chọn/bỏ chọn toàn bộ câu hỏi ĐANG
+                    // HIỆN trên màn hình — tức đã lọc theo tab
+                    // độ khó + ô tìm kiếm. Bấm khi đang lọc "Dễ"
+                    // thì chỉ chọn các câu dễ đang hiện, câu độ
+                    // khó khác giữ nguyên khi xóa.
+                    if (_selecting)
+                      Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: QuestionCard(question: question),
+                        child: Row(
+                          children: [
+                            TextButton(
+                              onPressed: _toggleSelectAllVisible,
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: Size.zero,
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                _allVisibleSelected
+                                    ? 'Bỏ chọn tất cả'
+                                    : 'Chọn tất cả',
+                                style: kDifficultyLabelStyle.copyWith(
+                                  color: kPrimary,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '${_selectedIds.length} đã chọn',
+                              style: kQuestionPreviewStyle,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+
+                    // Trạng thái tải / lỗi / danh sách.
+                    if (_loading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 32),
+                        child: Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (_error != null)
+                      Padding(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 16),
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Không tải được danh sách: $_error',
+                              style: kErrorTextStyle,
+                            ),
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: _loadQuestions,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kPrimary,
+                                foregroundColor: kOnPrimary,
+                              ),
+                              child: const Text('Thử lại'),
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (_visibleQuestions.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 32),
+                        child: Center(
+                          child: Text(
+                            'Chưa có câu hỏi nào.',
+                            style: kQuestionPreviewStyle,
+                          ),
+                        ),
+                      )
+                    else
+                      // Danh sách thẻ câu hỏi, thẻ cách nhau 12px.
+                      // Bình thường: bấm thẻ -> sửa, bấm giữ thẻ ->
+                      // vào trạng thái chọn nhiều. Ở trạng thái
+                      // chọn: bấm thẻ -> chọn/bỏ chọn.
+                      ..._visibleQuestions.map(
+                        (question) => Padding(
+                          padding:
+                              const EdgeInsets.only(bottom: 12),
+                          child: GestureDetector(
+                            onTap: () => _selecting
+                                ? _toggleSelect(question)
+                                : _openEdit(question),
+                            onLongPress: () =>
+                                _enterSelection(question),
+                            child: QuestionCard(
+                              question:
+                                  _toMockQuestion(question),
+                              selecting: _selecting,
+                              selected: _selectedIds.contains(
+                                question.id,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
 
                     // Đáy thẻ cuối -> thẻ AI: 24px.
                     const SizedBox(height: 12),
@@ -230,6 +609,12 @@ class _Mh22QuanLyCauHoiScreenState extends State<Mh22QuanLyCauHoiScreen> {
                 ),
               ),
             ),
+
+            // --- Thanh tác vụ trạng thái chọn: cố định dưới
+            // danh sách (nằm trên thanh điều hướng), chỉ hiện
+            // khi đang chọn nhiều. Danh sách cuộn lên xuống thì
+            // thanh này vẫn ở đó để bấm Xóa / Hủy.
+            if (_selecting) _buildSelectionBar(),
           ],
         ),
       ),
@@ -289,6 +674,84 @@ class _Mh22QuanLyCauHoiScreenState extends State<Mh22QuanLyCauHoiScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Thanh tác vụ khi đang chọn nhiều: nút Hủy (thoát trạng thái
+  /// chọn) + nút Xóa các mục đã chọn (đỏ kHard, kèm số lượng).
+  /// Nằm cố định dưới danh sách nên lướt lên xuống vẫn bấm được.
+  Widget _buildSelectionBar() {
+    final count = _selectedIds.length;
+    return Container(
+      decoration: const BoxDecoration(
+        color: kSurface,
+        border: Border(
+          top: BorderSide(color: kInputBorder, width: 1),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 48,
+              child: OutlinedButton(
+                onPressed:
+                    _deletingSelected ? null : _cancelSelection,
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(
+                    color: kRadioBorder,
+                    width: 1.5,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(kRadiusButton),
+                  ),
+                ),
+                child: const Text(
+                  'Hủy',
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: kTextSecondary,
+                    height: 1.0,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed:
+                    _deletingSelected ? null : _deleteSelected,
+                icon: const Icon(
+                  Icons.delete_outline,
+                  size: 20,
+                  color: kOnPrimary,
+                ),
+                label: Text(
+                  _deletingSelected
+                      ? 'Đang xóa...'
+                      : 'Xóa ($count)',
+                  style: kButtonTextStyle.copyWith(fontSize: 16),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kHard,
+                  foregroundColor: kOnPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(kRadiusButton),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

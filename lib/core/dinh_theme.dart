@@ -189,6 +189,17 @@ const TextStyle kAnswerBadgeStyle = TextStyle(
   height: 1.0,
 );
 
+// Kieu chu nut Xoa cau hoi (chi hien o che do Sua): Nunito 13px 700,
+// mau do kHard tren nen hong nhat kHardBackground — cung cap mau do
+// voi muc do Kho va chu bao loi o MH-22/MH-24.
+const TextStyle kDeleteButtonTextStyle = TextStyle(
+  fontFamily: 'Nunito',
+  fontSize: 13,
+  fontWeight: FontWeight.w700,
+  color: kHard,
+  height: 1.0,
+);
+
 // ---------------------------------------------------------------------------
 // Them cho MH-24 Import Excel, theo task MH-24.
 // ---------------------------------------------------------------------------
