@@ -86,6 +86,7 @@ Khi lỗi: `"success": false`, `"data": null`, `message` là thông điệp ngư
 | GET | `friends` | Danh sách bạn bè + lời mời kết bạn đang chờ |
 | POST | `friends/requests` | Gửi lời mời kết bạn: `{ "email": "..." }` |
 | POST | `friends/requests/{id}/accept` | Chấp nhận lời mời kết bạn |
+| DELETE | `friends/requests/{id}` | Hủy lời mời đã gửi / từ chối lời mời nhận được (chỉ khi đang chờ) |
 | DELETE | `friends/{userId}` | Hủy kết bạn |
 | POST | `battles` | Tạo phòng đối kháng 1-1: `{ "topicId": "...", "questionCount": 10 }` — **máy chủ rút ngẫu nhiên câu hỏi từ kho của chủ đề** và chốt vào phòng |
 | POST | `battles/{id}/join` | Vào phòng bằng mã phòng |

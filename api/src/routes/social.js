@@ -54,6 +54,19 @@ router.post('/friends/requests/:id/accept', (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Huy loi moi da gui hoac tu choi loi moi nhan duoc (chi khi con PENDING)
+router.delete('/friends/requests/:id', (req, res, next) => {
+  try {
+    const f = db.friendships.get(req.params.id);
+    if (!f || f.status !== 'PENDING') throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy lời mời đang chờ');
+    if (f.userA !== req.user.uid && f.userB !== req.user.uid) {
+      throw new ApiError(403, 'FORBIDDEN', 'Không có quyền xử lý lời mời này');
+    }
+    db.friendships.delete(f.id);
+    ok(res, null, f.userA === req.user.uid ? 'Đã hủy lời mời kết bạn' : 'Đã từ chối lời mời kết bạn');
+  } catch (e) { next(e); }
+});
+
 router.delete('/friends/:userId', (req, res) => {
   db.friendships.delete(`${req.user.uid}:${req.params.userId}`);
   db.friendships.delete(`${req.params.userId}:${req.user.uid}`);
