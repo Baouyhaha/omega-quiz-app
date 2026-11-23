@@ -60,16 +60,22 @@ class ExamAttemptViewModel extends ChangeNotifier {
     return forceSubmitted;
   }
 
-  /// Nộp bài thường — thuộc task T23, T22 chỉ viết khung sẵn ở đây.
+  /// Nộp bài thường — T23 gọi từ MH-09b.
   /// Khi bị nộp cưỡng bức thì KHÔNG gọi hàm này (server đã đóng lượt làm).
+  /// Chỉ gửi timeSpentSeconds cho câu nào đã đo thời gian thật — gửi 0
+  /// cho mọi câu sẽ làm server tính thưởng tốc độ tối đa (điểm vượt
+  /// tổng). Đo thời gian từng câu thuộc task làm bài; khi chưa có thì
+  /// server tính thưởng = 0, điểm = điểm gốc.
   Future<Map<String, dynamic>> submit() async {
-    final answers = selectedAnswers.entries
-        .map((e) => {
-              'questionId': e.key,
-              'selectedOption': e.value,
-              'timeSpentSeconds': timePerQuestion[e.key] ?? 0,
-            })
-        .toList();
+    final answers = selectedAnswers.entries.map((e) {
+      final a = <String, dynamic>{
+        'questionId': e.key,
+        'selectedOption': e.value,
+      };
+      final giay = timePerQuestion[e.key];
+      if (giay != null) a['timeSpentSeconds'] = giay;
+      return a;
+    }).toList();
     final data = await _api.post('attempts/$attemptId/submit', {
       'answers': answers,
     });

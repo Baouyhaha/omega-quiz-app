@@ -8,10 +8,10 @@
 ///   đủ 5 vi phạm → hộp "Bài đã tự nộp" → MH-10 (trạng thái bị nộp
 ///   cưỡng bức, không điểm).
 /// Không có thanh dưới (theo Figma).
-/// Dữ liệu giả: khối // MOCK: đầu file này (câu hỏi/đáp án/đồng hồ —
-///   thuộc task làm bài, T22 không đụng vào).
 /// Chức năng thật: T22 nối chống gian lận (đếm rời app + tự nộp đủ 5 lần);
-///   chọn đáp án/đếm giờ/nộp bài thật thuộc task làm bài + T23.
+///   T23 hiện câu hỏi thật từ API + chọn đáp án + chuyển câu (phục vụ
+///   nộp bài — câu hỏi phát từ server KHÔNG kèm đáp án đúng/giải thích).
+///   Đồng hồ đếm ngược + Tip/Trợ giúp vẫn mock, thuộc task làm bài.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -19,18 +19,6 @@ import '../core/app_theme.dart';
 import '../services/api_client.dart';
 import '../viewmodels/exam_attempt_viewmodel.dart';
 import 'mh09b_hop_thoai_nop_bai_screen.dart';
-
-// MOCK: dữ liệu giả cho MH-09 — thay bằng API phát đề ở giai đoạn chức năng.
-// Đáp án B đang được chọn (như Figma).
-const _mockQuestion = {
-  'index': 7,
-  'total': 20,
-  'timeLeft': '12:34',
-  'content': 'Đạo hàm của f(x) = x² tại x = 2 bằng bao nhiêu?',
-  'options': ['2', '4', '8', '0'],
-};
-const _mockSelected = 1;
-const _mockUnanswered = 3;
 
 class Mh09LamBaiScreen extends StatefulWidget {
   const Mh09LamBaiScreen({super.key});
@@ -43,6 +31,8 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
     with WidgetsBindingObserver {
   // Đánh dấu đã rời app, để khi quay lại mới đếm 1 lần.
   bool _daRoiApp = false;
+  // Vị trí câu đang xem trong danh sách đề (0 = câu đầu).
+  int _cauHienTai = 0;
 
   @override
   void initState() {
@@ -162,15 +152,47 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
     final vm = context.watch<ExamAttemptViewModel>();
     final violations = vm.violations;
     const maxViolations = ExamAttemptViewModel.maxViolations;
-    final options = _mockQuestion['options'] as List<String>;
-    final index = _mockQuestion['index'] as int;
-    final total = _mockQuestion['total'] as int;
+    final questions = vm.questions;
+    final total = questions.length;
+
+    // Đề chưa tải xong (đang gọi API hoặc lỗi): hiện vòng xoay, không
+    // hiện câu hỏi giả — tránh nộp nhầm đáp án của câu không có thật.
+    if (total == 0) {
+      return Scaffold(
+        appBar: AppBar(centerTitle: true, title: const Text('Làm bài')),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              const Text('Đang tải đề...',
+                  style: TextStyle(color: kTextSecondary)),
+              const SizedBox(height: 16),
+              OutlinedButton(
+                onPressed: _batDauLuotLam,
+                child: const Text('Tải lại'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Kẹp vị trí câu trong giới hạn đề (đề mới tải có thể ít câu hơn).
+    if (_cauHienTai >= total) _cauHienTai = total - 1;
+    final cau = questions[_cauHienTai];
+    final questionId = cau['id'] as String;
+    final options = List<String>.from(cau['options'] as List);
+    final daChon = vm.selectedAnswers[questionId];
+    final soCauChuaTraLoi = total - vm.selectedAnswers.length;
+
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: Text('Câu $index/$total'),
+        title: Text('Câu ${_cauHienTai + 1}/$total'),
         actions: [
-          // Đồng hồ đếm ngược — chạy thật ở task T16.
+          // Đồng hồ đếm ngược — chạy thật ở task làm bài.
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Row(
@@ -178,7 +200,7 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
                 const Icon(Icons.timer_outlined,
                     size: 20, color: kTextPrimary),
                 const SizedBox(width: 4),
-                Text(_mockQuestion['timeLeft'] as String,
+                Text('12:34',
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
@@ -196,7 +218,7 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
             // Thanh tiến trình làm bài — nền kProgressTrack #E4E0F5,
             // phần đã làm tím đặc kPrimary.
             LinearProgressIndicator(
-              value: index / total,
+              value: (_cauHienTai + 1) / total,
               color: kPrimary,
               backgroundColor: kProgressTrack,
             ),
@@ -213,7 +235,7 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_mockQuestion['content'] as String,
+                    Text(cau['content'] as String,
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium
@@ -227,15 +249,43 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
             ),
             const SizedBox(height: 12),
             // 4 ô đáp án — màu huy hiệu chữ lấy từ hằng số kOptionColors.
+            // Bấm để chọn, đáp án lưu vào ViewModel (nộp ở MH-09b).
             ...List.generate(options.length, (i) {
               return _AnswerOption(
                 letter: 'ABCD'[i],
                 text: options[i],
                 color: kOptionColors[i],
-                selected: i == _mockSelected,
+                selected: daChon == i,
+                onTap: () =>
+                    context.read<ExamAttemptViewModel>().selectAnswer(
+                          questionId,
+                          i,
+                        ),
               );
             }),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
+            // Chuyển câu — Figma không vẽ nút này, thêm để làm được đề
+            // nhiều câu (task làm bài có thể thay bằng lưới câu hỏi).
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: _cauHienTai > 0
+                      ? () => setState(() => _cauHienTai--)
+                      : null,
+                  icon: const Icon(Icons.chevron_left),
+                  label: const Text('Câu trước'),
+                ),
+                TextButton.icon(
+                  onPressed: _cauHienTai < total - 1
+                      ? () => setState(() => _cauHienTai++)
+                      : null,
+                  icon: const Icon(Icons.chevron_right),
+                  label: const Text('Câu sau'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
             Row(
               children: [
                 Expanded(
@@ -279,8 +329,8 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
                 context: context,
                 // Lớp mờ sau dialog #000000 opacity 0.55 (Figma).
                 barrierColor: Colors.black.withValues(alpha: 0.55),
-                builder: (_) =>
-                    const Mh09bHopThoaiNopBai(unanswered: _mockUnanswered),
+                builder: (_) => Mh09bHopThoaiNopBai(
+                    unanswered: soCauChuaTraLoi),
               ),
               child: const Text('Nộp bài'),
             ),
@@ -300,12 +350,14 @@ class _AnswerOption extends StatelessWidget {
     required this.text,
     required this.color,
     required this.selected,
+    required this.onTap,
   });
 
   final String letter;
   final String text;
   final Color color;
   final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -323,8 +375,7 @@ class _AnswerOption extends StatelessWidget {
               style: const TextStyle(color: Colors.white)),
         ),
         title: Text(text, style: const TextStyle(color: kTextPrimary)),
-        // Chọn đáp án thật ở task T16 — hiện chỉ để xem bố cục.
-        onTap: () {},
+        onTap: onTap,
       ),
     );
   }
