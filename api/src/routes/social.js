@@ -78,6 +78,59 @@ const battleView = (r) => ({
   id: r.id, code: r.code, topicId: r.topicId, hostId: r.hostId, guestId: r.guestId,
   status: r.status, questionCount: r.questionIds.length,
   ready: r.ready, results: r.results || null, createdAt: r.createdAt,
+  players: [r.hostId, r.guestId].filter(Boolean).map((uid) => {
+    const u = db.users.get(uid);
+    return {
+      uid, name: u ? u.name : uid,
+      ready: !!(r.ready && r.ready[uid]),
+      submitted: !!(r.submissions && r.submissions[uid]),
+      answeredCount: (r.progress && r.progress[uid]) || 0,
+    };
+  }),
+});
+
+const findRoom = (key) => db.battleRooms.get(key) ||
+  [...db.battleRooms.values()].find((r) => r.code === String(key).toUpperCase());
+
+// Xem trang thai phong (app goi lap lai de biet tran da bat dau chua,
+// tien do doi thu, ket qua); vao tran roi ma chua co luot lam thi tao luon
+// va tra cau hoi (khong kem dap an dung)
+router.get('/battles/:id', (req, res, next) => {
+  try {
+    const room = findRoom(req.params.id);
+    if (!room) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy phòng');
+    if (room.hostId !== req.user.uid && room.guestId !== req.user.uid) {
+      throw new ApiError(403, 'FORBIDDEN', 'Bạn không ở trong phòng này');
+    }
+    let questions = null;
+    let attemptId = null;
+    if (room.status === 'IN_PROGRESS') {
+      room.attemptByUser = room.attemptByUser || {};
+      if (!room.attemptByUser[req.user.uid]) {
+        const attempt = startAttempt(req.user, null, room.questionIds, { topicId: room.topicId, battleId: room.id });
+        room.attemptByUser[req.user.uid] = attempt.id;
+      }
+      attemptId = room.attemptByUser[req.user.uid];
+      const attempt = db.attempts.get(attemptId);
+      questions = attempt.questionIds.map((id) => publicQuestion(db.questions.get(id)));
+    }
+    ok(res, { ...battleView(room), attemptId, questions });
+  } catch (e) { next(e); }
+});
+
+// Bao tien do lam bai cua minh de doi thu thay (MH-16: "doi thu da lam 5/20 cau")
+router.post('/battles/:id/progress', (req, res, next) => {
+  try {
+    const room = findRoom(req.params.id);
+    if (!room) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy phòng');
+    if (room.hostId !== req.user.uid && room.guestId !== req.user.uid) {
+      throw new ApiError(403, 'FORBIDDEN', 'Bạn không ở trong phòng này');
+    }
+    const n = Math.max(0, Math.min(room.questionIds.length, Number((req.body || {}).answeredCount) || 0));
+    room.progress = room.progress || {};
+    room.progress[req.user.uid] = n;
+    ok(res, battleView(room), 'Đã cập nhật tiến độ');
+  } catch (e) { next(e); }
 });
 
 router.post('/battles', (req, res, next) => {
