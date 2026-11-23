@@ -5,7 +5,7 @@
 /// Đi tiếp tới: MH-09b Hộp thoại nộp bài (bấm Nộp bài) → MH-10 Kết quả.
 /// Không có thanh dưới (theo Figma).
 /// Dữ liệu giả: khối // MOCK: đầu file này.
-/// Chức năng thật: nối ở task T16 + T17 (để giai đoạn chức năng).
+/// Chức năng thật: nối ở task T21 (để giai đoạn chức năng).
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
@@ -38,7 +38,7 @@ class Mh09LamBaiScreen extends StatelessWidget {
         centerTitle: true,
         title: Text('Câu $index/$total'),
         actions: [
-          // Đồng hồ đếm ngược — chạy thật ở task T16.
+          // Đồng hồ đếm ngược — chạy thật ở task T21.
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Row(
@@ -132,7 +132,7 @@ class Mh09LamBaiScreen extends StatelessWidget {
             const _TroGiupPanel(),
             const SizedBox(height: 12),
             // Cảnh báo rời bài — Figma chỉ vẽ dòng chữ đỏ, không nền,
-            // không icon (task T17).
+            // không icon (task T22 — dòng cảnh báo rời bài thuộc chống gian lận).
             Text(
               'Đã rời bài $_mockViolations/$_mockMaxViolations lần — '
               'đủ $_mockMaxViolations lần bài sẽ tự nộp',
@@ -189,7 +189,7 @@ class _AnswerOption extends StatelessWidget {
               style: const TextStyle(color: Colors.white)),
         ),
         title: Text(text, style: const TextStyle(color: kTextPrimary)),
-        // Chọn đáp án thật ở task T16 — hiện chỉ để xem bố cục.
+        // Chọn đáp án thật ở task T21 — hiện chỉ để xem bố cục.
         onTap: () {},
       ),
     );
