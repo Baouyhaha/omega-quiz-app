@@ -4,7 +4,7 @@
 /// Đi tiếp tới: MH-10 Kết quả (bấm Nộp bài) / quay lại MH-09 (bấm Hủy).
 /// Không có thanh dưới (hộp thoại hiện trên MH-09, theo Figma).
 /// Dữ liệu giả: số câu chưa trả lời truyền từ MH-09 (mock: 3 câu).
-/// Chức năng thật: nối ở task T16 + T17 (để giai đoạn chức năng).
+/// Chức năng thật: nối ở task T21 (để giai đoạn chức năng).
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
