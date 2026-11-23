@@ -12,6 +12,8 @@ import 'package:provider/provider.dart';
 import '../core/app_theme.dart';
 import '../services/api_client.dart';
 import '../viewmodels/exam_attempt_viewmodel.dart';
+import '../core/chuyen_canh.dart';
+import 'mh10_ket_qua_screen.dart';
 
 class Mh09bHopThoaiNopBai extends StatelessWidget {
   const Mh09bHopThoaiNopBai({super.key, required this.unanswered});
@@ -67,13 +69,16 @@ class Mh09bHopThoaiNopBai extends StatelessWidget {
                         final ketQua = await vm.submit();
                         if (!context.mounted) return;
                         Navigator.pop(context); // đóng dialog
-                        Navigator.pushNamed(
+                        // T13: sang MH-10 bằng chuyển cảnh mờ dần 250ms.
+                        Navigator.push(
                           context,
-                          '/mh10',
-                          arguments: {
-                            ...ketQua,
-                            'examId': vm.examId,
-                          },
+                          routeChuyenCanh(
+                            const Mh10KetQuaScreen(),
+                            arguments: {
+                              ...ketQua,
+                              'examId': vm.examId,
+                            },
+                          ),
                         );
                       } on ApiException catch (e) {
                         if (!context.mounted) return;

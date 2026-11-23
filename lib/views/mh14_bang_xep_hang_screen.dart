@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 
 import '../core/app_theme.dart';
 import '../services/api_client.dart';
+import '../services/sound_service.dart';
 import '../utils/rank_helper.dart';
 import '../viewmodels/bang_xep_hang_viewmodel.dart';
 
@@ -55,6 +56,8 @@ class _Mh14NoiDungState extends State<_Mh14NoiDung> {
         if (rankMoi != null && rankMoi != _rankDaHienDialog) {
           _rankDaHienDialog = rankMoi;
           WidgetsBinding.instance.addPostFrameCallback((_) {
+            // T13: tiếng lên rank kèm dialog chúc mừng.
+            SoundService.instance.playRankUp();
             _hienDialogLenRank(context, rankMoi);
             vm.xacNhanDaXemLenRank();
           });

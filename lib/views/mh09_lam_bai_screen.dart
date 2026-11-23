@@ -18,6 +18,7 @@ import 'package:provider/provider.dart';
 import '../core/app_theme.dart';
 import '../services/api_client.dart';
 import '../viewmodels/exam_attempt_viewmodel.dart';
+import '../services/sound_service.dart';
 import 'mh09b_hop_thoai_nop_bai_screen.dart';
 
 class Mh09LamBaiScreen extends StatefulWidget {
@@ -106,6 +107,8 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
     if (!mounted) return;
 
     if (biNopCuongBuc) {
+      // T13: tiếng chuông khi bị nộp cưỡng bức do rời app đủ 5 lần.
+      SoundService.instance.playTimeout();
       await showDialog(
         context: context,
         barrierDismissible:
@@ -256,11 +259,15 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
                 text: options[i],
                 color: kOptionColors[i],
                 selected: daChon == i,
-                onTap: () =>
-                    context.read<ExamAttemptViewModel>().selectAnswer(
-                          questionId,
-                          i,
-                        ),
+                onTap: () {
+                  // T13: tiếng tap khi chọn đáp án (trong bài thi chỉ
+                  // phát tiếng tap, KHÔNG phát tiếng đúng/sai — quy tắc E5).
+                  SoundService.instance.playTap();
+                  context.read<ExamAttemptViewModel>().selectAnswer(
+                        questionId,
+                        i,
+                      );
+                },
               );
             }),
             const SizedBox(height: 4),
@@ -344,7 +351,7 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
 /// 1 ô đáp án: huy hiệu chữ màu (A–D) + nội dung; viền màu của đáp án
 /// đó (chưa chọn 2px, đang chọn 3px); đáp án đang chọn tô nền tint
 /// theo màu của đáp án đó (Figma: B chọn → nền #E3F2FD).
-class _AnswerOption extends StatelessWidget {
+class _AnswerOption extends StatefulWidget {
   const _AnswerOption({
     required this.letter,
     required this.text,
@@ -360,22 +367,45 @@ class _AnswerOption extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_AnswerOption> createState() => _AnswerOptionState();
+}
+
+class _AnswerOptionState extends State<_AnswerOption> {
+  // T13: hiệu ứng chạm — ô đáp án thu nhỏ nhẹ (0.97) khi đang bấm,
+  // trở lại 1.0 khi thả (120ms). Chỉ theo dõi trạng thái bấm, việc
+  // chọn đáp án + tiếng tap vẫn ở onTap của ListTile bên trong.
+  bool _dangBam = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Card(
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _dangBam = true),
+      onTapUp: (_) => setState(() => _dangBam = false),
+      onTapCancel: () => setState(() => _dangBam = false),
+      child: AnimatedScale(
+        scale: _dangBam ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        child: Card(
       margin: const EdgeInsets.only(bottom: 8),
-      color: selected ? color.withValues(alpha: 0.12) : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: color, width: selected ? 3 : 2),
-      ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: color,
-          child: Text(letter,
-              style: const TextStyle(color: Colors.white)),
+          color: widget.selected
+              ? widget.color.withValues(alpha: 0.12)
+              : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(
+                color: widget.color, width: widget.selected ? 3 : 2),
+          ),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: widget.color,
+              child: Text(widget.letter,
+                  style: const TextStyle(color: Colors.white)),
+            ),
+            title: Text(widget.text,
+                style: const TextStyle(color: kTextPrimary)),
+            onTap: widget.onTap,
+          ),
         ),
-        title: Text(text, style: const TextStyle(color: kTextPrimary)),
-        onTap: onTap,
       ),
     );
   }

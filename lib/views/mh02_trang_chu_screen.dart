@@ -12,6 +12,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/app_theme.dart';
+import '../core/chuyen_canh.dart';
+import '../services/sound_service.dart';
+import 'mh09_lam_bai_screen.dart';
 import '../models/exam.dart';
 import '../services/api_client.dart';
 import '../viewmodels/trang_chu_viewmodel.dart';
@@ -156,12 +159,20 @@ class Mh02TrangChuScreen extends StatelessWidget {
                   ),
                 ...viewModel.boDeMoi.map((boDe) => _TheBoDe(
                       boDe: boDe,
-                      onTraLoiNgay: () => Navigator.pushNamed(
-                          context, '/mh09',
-                          arguments: boDe.id),
+                      // T13: vào MH-09 bằng chuyển cảnh mờ dần 250ms.
+                      onTraLoiNgay: () => Navigator.push(
+                          context,
+                          routeChuyenCanh(const Mh09LamBaiScreen(),
+                              arguments: boDe.id)),
                       onTap: () =>
                           _moChiTietBoDe(context, viewModel, boDe.id),
                     )),
+                // T13 — CÔNG TẮC ÂM THANH TẠM: mục Cài đặt nằm trong MH-03
+                // (màn của Uy), Danh không tự sửa MH-03 nên tạm đặt công
+                // tắc ở cuối MH-02 để nghiệm thu được ngay. Khi Uy gắn
+                // công tắc vào MH-03 thì xóa khối này ở đây.
+                const SizedBox(height: 16),
+                const _CongTacAmThanh(),
               ],
             ),
           ),
@@ -183,6 +194,36 @@ class Mh02TrangChuScreen extends StatelessWidget {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(e.message)));
     }
+  }
+}
+
+/// Công tắc bật/tắt âm thanh (T13, TẠM ở MH-02 — xem ghi chú ở chỗ
+/// dùng). SoundService đọc lại SharedPreferences mỗi lần phát nên gạt
+/// tắt là tiếng dừng ngay, không cần restart app.
+class _CongTacAmThanh extends StatefulWidget {
+  const _CongTacAmThanh();
+
+  @override
+  State<_CongTacAmThanh> createState() => _CongTacAmThanhState();
+}
+
+class _CongTacAmThanhState extends State<_CongTacAmThanh> {
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: SoundService.instance.isSoundEnabled,
+      builder: (context, snapshot) {
+        final enabled = snapshot.data ?? true;
+        return SwitchListTile(
+          title: const Text('Âm thanh'),
+          value: enabled,
+          onChanged: (value) async {
+            await SoundService.instance.setSoundEnabled(value);
+            setState(() {});
+          },
+        );
+      },
+    );
   }
 }
 
