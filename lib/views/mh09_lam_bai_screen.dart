@@ -1,18 +1,27 @@
 /// MH-09 — Làm bài.
 /// Luồng: L2 (Làm bài thường); L6/L7 khi thi đấu (đối kháng / đợt thi).
-/// Vào từ: MH-08 Chi tiết bộ đề (Bắt đầu) / MH-16 Đối kháng (Sẵn sàng) /
-///   MH-17 Đợt thi (Vào thi).
-/// Đi tiếp tới: MH-09b Hộp thoại nộp bài (bấm Nộp bài) → MH-10 Kết quả.
+/// Vào từ: MH-02 Trang chủ (Trả lời ngay) / MH-08 Chi tiết bộ đề (Bắt đầu)
+///   kèm examId qua arguments; mở trực tiếp từ menu preview thì dùng đề
+///   mẫu 'exam_giuaky'. MH-09 tự tạo lượt làm khi mở (T22) — chỉ 1 chỗ
+///   duy nhất tạo lượt làm, nút ngoài màn chỉ điều hướng kèm examId.
+/// Đi tiếp tới: MH-09b Hộp thoại nộp bài (bấm Nộp bài) → MH-10 Kết quả;
+///   đủ 5 vi phạm → hộp "Bài đã tự nộp" → MH-10 (trạng thái bị nộp
+///   cưỡng bức, không điểm).
 /// Không có thanh dưới (theo Figma).
-/// Dữ liệu giả: khối // MOCK: đầu file này.
-/// Chức năng thật: nối ở task T16 + T17 (để giai đoạn chức năng).
+/// Dữ liệu giả: khối // MOCK: đầu file này (câu hỏi/đáp án/đồng hồ —
+///   thuộc task làm bài, T22 không đụng vào).
+/// Chức năng thật: T22 nối chống gian lận (đếm rời app + tự nộp đủ 5 lần);
+///   chọn đáp án/đếm giờ/nộp bài thật thuộc task làm bài + T23.
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../core/app_theme.dart';
+import '../services/api_client.dart';
+import '../viewmodels/exam_attempt_viewmodel.dart';
 import 'mh09b_hop_thoai_nop_bai_screen.dart';
 
 // MOCK: dữ liệu giả cho MH-09 — thay bằng API phát đề ở giai đoạn chức năng.
-// Đáp án B đang được chọn (như Figma); đã rời bài 1/5 lần.
+// Đáp án B đang được chọn (như Figma).
 const _mockQuestion = {
   'index': 7,
   'total': 20,
@@ -22,14 +31,137 @@ const _mockQuestion = {
 };
 const _mockSelected = 1;
 const _mockUnanswered = 3;
-const _mockViolations = 1;
-const _mockMaxViolations = 5;
 
-class Mh09LamBaiScreen extends StatelessWidget {
+class Mh09LamBaiScreen extends StatefulWidget {
   const Mh09LamBaiScreen({super.key});
 
   @override
+  State<Mh09LamBaiScreen> createState() => _Mh09LamBaiScreenState();
+}
+
+class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
+    with WidgetsBindingObserver {
+  // Đánh dấu đã rời app, để khi quay lại mới đếm 1 lần.
+  bool _daRoiApp = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Tạo lượt làm khi vào màn. examId lấy từ arguments (mở từ nút
+    // "Trả lời ngay"/"Bắt đầu"); mở trực tiếp từ menu thì dùng đề mẫu.
+    // Lưu ý: hot restart (R) chạy lại initState nên tạo lượt làm mới —
+    // lượt làm dở (IN_PROGRESS) không tính vào giới hạn 3 lượt, chỉ lượt
+    // đã nộp/bị nộp mới tính, nên test thoải mái; hết 3 lượt đã nộp
+    // thì restart API để reset dữ liệu.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _batDauLuotLam());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Tạo lượt làm khi vào màn. Lỗi (hết lượt, API tắt...) thì hiện
+  /// SnackBar để biết lý do thay vì im lặng không đếm được vi phạm.
+  Future<void> _batDauLuotLam() async {
+    final examId =
+        ModalRoute.of(context)?.settings.arguments as String? ??
+            'exam_giuaky';
+    try {
+      await context.read<ExamAttemptViewModel>().startAttempt(examId);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Không bắt đầu được lượt làm. Kiểm tra API local đã chạy chưa.')));
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final vm = context.read<ExamAttemptViewModel>();
+
+    // Chỉ đếm khi lượt làm còn đang làm dở.
+    if (vm.status != AttemptStatus.inProgress) return;
+
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      // App bị rời khỏi màn hình (bấm Home, chuyển app, khóa máy...).
+      // Không đếm ở `inactive` (kéo thanh thông báo, hộp thoại hệ thống)
+      // vì đó chỉ là che tạm thời, đếm sẽ oan.
+      _daRoiApp = true;
+    } else if (state == AppLifecycleState.resumed && _daRoiApp) {
+      // Vừa quay lại app sau khi đã rời -> tính 1 lần vi phạm.
+      // Đếm khi quay lại chứ không đếm ngay khi rời: để gọi API + hiện
+      // cảnh báo luôn trong 1 lần, tránh gọi API lúc app đang nền.
+      _daRoiApp = false;
+      _xuLyQuayLaiSauKhiRoiApp();
+    }
+  }
+
+  /// Quay lại sau khi rời app: báo vi phạm lên server rồi hiện hộp cảnh báo.
+  /// Đủ 5 lần thì hiện hộp "Bài đã tự nộp" rồi sang MH-10 ở trạng thái
+  /// bị nộp cưỡng bức (không điểm). Khi bị nộp cưỡng bức thì KHÔNG gọi
+  /// submit() nữa — server đã tự đóng lượt làm.
+  Future<void> _xuLyQuayLaiSauKhiRoiApp() async {
+    final vm = context.read<ExamAttemptViewModel>();
+
+    final biNopCuongBuc = await vm.reportViolation();
+    if (!mounted) return;
+
+    if (biNopCuongBuc) {
+      await showDialog(
+        context: context,
+        barrierDismissible:
+            false, // bắt buộc bấm nút, không tắt bằng cách khác
+        builder: (_) => AlertDialog(
+          title: const Text('Bài đã tự nộp'),
+          content: const Text(
+              'Bạn đã rời bài đủ 5 lần nên bài làm đã tự nộp.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Đã hiểu'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      Navigator.pushNamed(
+        context,
+        '/mh10',
+        arguments: {'forceSubmitted': true},
+      );
+    } else {
+      await showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Cảnh báo rời bài'),
+          content: Text(
+              'Bạn đã rời bài ${vm.violations}/5 lần. '
+              'Đủ 5 lần bài sẽ tự nộp.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Tiếp tục làm bài'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final vm = context.watch<ExamAttemptViewModel>();
+    final violations = vm.violations;
+    const maxViolations = ExamAttemptViewModel.maxViolations;
     final options = _mockQuestion['options'] as List<String>;
     final index = _mockQuestion['index'] as int;
     final total = _mockQuestion['total'] as int;
@@ -131,15 +263,17 @@ class Mh09LamBaiScreen extends StatelessWidget {
             // này mở ra từ nút Trợ giúp (giai đoạn chức năng).
             const _TroGiupPanel(),
             const SizedBox(height: 12),
-            // Cảnh báo rời bài — Figma chỉ vẽ dòng chữ đỏ, không nền,
-            // không icon (task T17).
-            Text(
-              'Đã rời bài $_mockViolations/$_mockMaxViolations lần — '
-              'đủ $_mockMaxViolations lần bài sẽ tự nộp',
-              style: const TextStyle(
-                  color: kError, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 12),
+            // Cảnh báo rời bài — số thật từ ViewModel (T22), chỉ hiện khi
+            // đã vi phạm ít nhất 1 lần. Figma chỉ vẽ dòng chữ đỏ, không
+            // nền, không icon.
+            if (violations > 0)
+              Text(
+                'Đã rời bài $violations/$maxViolations lần — '
+                'đủ $maxViolations lần bài sẽ tự nộp',
+                style: const TextStyle(
+                    color: kError, fontWeight: FontWeight.w700),
+              ),
+            if (violations > 0) const SizedBox(height: 12),
             ElevatedButton(
               onPressed: () => showDialog(
                 context: context,
