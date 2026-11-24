@@ -115,14 +115,16 @@ class _Mh22QuanLyCauHoiScreenState extends State<Mh22QuanLyCauHoiScreen> {
   }
 
   /// Tải danh sách câu hỏi của chủ đề qua API #16.
+  /// Chỉ hiện spinner khi chưa có dữ liệu (lần tải đầu); tải lại
+  /// (kéo xuống, quay về từ MH-23/MH-24) thì giữ danh sách cũ hiển
+  /// thị tại chỗ cho đến khi dữ liệu mới về.
   Future<void> _loadQuestions() async {
     setState(() {
-      _loading = true;
+      _loading = _questions.isEmpty;
       _error = null;
     });
     try {
-      final questions =
-          await DinhApi.fetchQuestions(widget.topicId);
+      final questions = await DinhApi.fetchQuestions(widget.topicId);
       if (!mounted) return;
       setState(() {
         _questions = questions;
@@ -130,10 +132,18 @@ class _Mh22QuanLyCauHoiScreenState extends State<Mh22QuanLyCauHoiScreen> {
       });
     } on ApiException catch (e) {
       if (!mounted) return;
+      final hadData = _questions.isNotEmpty;
       setState(() {
-        _error = e.message;
         _loading = false;
+        // Chưa có dữ liệu thì hiện hộp lỗi + nút "Thử lại";
+        // đã có dữ liệu thì giữ danh sách cũ, báo lỗi bằng SnackBar.
+        _error = hadData ? null : e.message;
       });
+      if (hadData) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
     }
   }
 
@@ -356,11 +366,18 @@ class _Mh22QuanLyCauHoiScreenState extends State<Mh22QuanLyCauHoiScreen> {
             ),
 
             // --- Nội dung: cuộn được nếu màn hình nhỏ ---
+            // Kéo xuống khi đã ở đầu trang để tải lại danh sách (#16).
+            // AlwaysScrollableScrollPhysics để kéo được cả khi danh
+            // sách ngắn chưa kín màn hình.
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: kSpacing20,
-                ),
+              child: RefreshIndicator(
+                onRefresh: _loadQuestions,
+                color: kPrimary,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: kSpacing20,
+                  ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -439,9 +456,17 @@ class _Mh22QuanLyCauHoiScreenState extends State<Mh22QuanLyCauHoiScreen> {
                           child: SizedBox(
                             height: kButtonHeight,
                             child: OutlinedButton(
-                            onPressed: () {
+                            onPressed: () async {
                               // Đích theo task: MH-24 Import Excel.
-                              Navigator.pushNamed(context, '/mh24');
+                              // MH-24 pop(true) khi xac nhan luu thanh cong
+                              // (#21) thi tai lai danh sach de hien cac cau
+                              // vua nhap; pop khong co gia tri (nut quay
+                              // lai / huy) thi giu nguyen danh sach cu.
+                              final imported = await Navigator.pushNamed(
+                                context,
+                                '/mh24',
+                              );
+                              if (imported == true) _loadQuestions();
                             },
                             style: OutlinedButton.styleFrom(
                               backgroundColor: kSurface,
@@ -607,6 +632,7 @@ class _Mh22QuanLyCauHoiScreenState extends State<Mh22QuanLyCauHoiScreen> {
                     const SizedBox(height: 20),
                   ],
                 ),
+              ),
               ),
             ),
 
