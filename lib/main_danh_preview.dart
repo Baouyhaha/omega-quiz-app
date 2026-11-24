@@ -93,7 +93,7 @@ class _PreviewApp extends StatelessWidget {
           '/mh09': (_) => const Mh09LamBaiScreen(),
           '/mh10': (_) => const Mh10KetQuaScreen(),
           '/mh11': (_) => const Mh11XemLaiScreen(),
-          '/mh15': (_) => const Mh15BanBeScreen(),
+          '/mh15': (_) => const Mh15BanBeScreen(token: 'dev:danh'),
           '/mh18': (_) => const Mh18KetQuaDotThiScreen(),
           // MH-08: màn chờ hiện dữ liệu chi tiết thật (MH-08 thật của Thịnh
           // chưa xong). Khi Thịnh xong thì đổi route này sang màn thật.
