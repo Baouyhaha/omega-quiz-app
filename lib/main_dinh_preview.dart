@@ -6,10 +6,8 @@ import 'views/mh22_quan_ly_cau_hoi_screen.dart';
 import 'views/mh23_soan_sua_cau_hoi_screen.dart';
 import 'views/mh24_import_excel_screen.dart';
 import 'views/mh27_thong_ke_chu_de_screen.dart';
-import 'views/mh30_admin_tai_khoan_screen.dart';
+import 'views/admin_host_screen.dart';
 import 'views/mh31_admin_chi_tiet_tai_khoan_screen.dart';
-import 'views/mh32_admin_goi_va_han_muc_screen.dart';
-import 'views/mh33_admin_thong_ke_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Diem chay thu RIENG cua Dinh — lib/main_dinh_preview.dart
@@ -36,9 +34,9 @@ class DinhPreviewApp extends StatelessWidget {
       theme: buildDinhTheme(),
       // Chay thu thang MH-22 de test T18 (noi API that): danh sach
       // cau hoi cua chu de Tieng Anh (topic_anh) lay tu API cua Uy.
-      // Muon chay thu tu MH-30 thi doi home thanh
-      // Mh30AdminTaiKhoanScreen() (bam the Danh sang MH-31).
-      home: Mh22QuanLyCauHoiScreen(),
+      // Muon chay thu khu vuc Admin thi doi home thanh
+      // AdminHostScreen() (thanh tab dung yen, chi noi dung truot).
+      home: AdminHostScreen(),
       routes: {
         '/mh20': (context) => const Mh20TaoSuaChuDeScreen(),
         // Che do sua, dung chung form MH-20.
@@ -51,10 +49,19 @@ class DinhPreviewApp extends StatelessWidget {
             const Mh23SoanSuaCauHoiScreen(isEdit: true),
         '/mh24': (context) => Mh24ImportExcelScreen(),
         '/mh27': (context) => Mh27ThongKeChuDeScreen(),
-        '/mh30': (context) => Mh30AdminTaiKhoanScreen(),
-        '/mh31': (context) => Mh31AdminChiTietTaiKhoanScreen(),
-        '/mh32': (context) => Mh32AdminGoiVaHanMucScreen(),
-        '/mh33': (context) => Mh33AdminThongKeScreen(),
+        // Khu vuc Admin chay qua màn host chung: thanh tab dung yen
+        // duoi day, noi dung MH-30/32/33 truot ngang khi doi tab.
+        '/mh30': (context) => const AdminHostScreen(initialIndex: 0),
+        // MH-30 truyen ma tai khoan qua arguments; mo truc tiep
+        // khong co arguments thi mac dinh xem tai khoan Danh.
+        '/mh31': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          return Mh31AdminChiTietTaiKhoanScreen(
+            accountId: args is String ? args : 'danh',
+          );
+        },
+        '/mh32': (context) => const AdminHostScreen(initialIndex: 1),
+        '/mh33': (context) => const AdminHostScreen(initialIndex: 2),
       },
     );
   }
