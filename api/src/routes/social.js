@@ -20,7 +20,7 @@ router.get('/friends', (req, res) => {
     }
     if (f.status === 'PENDING' && f.userB === uid) {
       const from = db.users.get(f.userA);
-      pending.push({ id: f.id, from: from ? { uid: from.uid, name: from.name, email: from.email } : null });
+      pending.push({ id: f.id, from: from ? { uid: from.uid, name: from.name, email: from.email, rankScore: from.rankScore } : null });
     }
   }
   ok(res, { friends, pendingRequests: pending });
