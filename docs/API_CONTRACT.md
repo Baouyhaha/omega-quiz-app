@@ -86,11 +86,14 @@ Khi lỗi: `"success": false`, `"data": null`, `message` là thông điệp ngư
 | GET | `friends` | Danh sách bạn bè + lời mời kết bạn đang chờ |
 | POST | `friends/requests` | Gửi lời mời kết bạn: `{ "email": "..." }` |
 | POST | `friends/requests/{id}/accept` | Chấp nhận lời mời kết bạn |
+| DELETE | `friends/requests/{id}` | Hủy lời mời đã gửi / từ chối lời mời nhận được (chỉ khi đang chờ) |
 | DELETE | `friends/{userId}` | Hủy kết bạn |
 | POST | `battles` | Tạo phòng đối kháng 1-1: `{ "topicId": "...", "questionCount": 10 }` — **máy chủ rút ngẫu nhiên câu hỏi từ kho của chủ đề** và chốt vào phòng |
 | POST | `battles/{id}/join` | Vào phòng bằng mã phòng |
 | POST | `battles/{id}/ready` | Sẵn sàng; cả hai sẵn sàng → phòng bắt đầu |
 | POST | `battles/{id}/submit` | Nộp bài trong trận → khi cả hai đã nộp, máy chủ tổng kết và cộng/trừ rankScore (+15/0/−10) |
+| GET | `battles/{id}` | Xem trạng thái phòng (app gọi lặp lại): người chơi + sẵn sàng + tiến độ đối thủ; trận đang diễn ra thì trả kèm câu hỏi (không đáp án) và tạo lượt làm nếu chưa có |
+| POST | `battles/{id}/progress` | Báo tiến độ của mình: `{ "answeredCount": 5 }` để đối thủ thấy đã làm mấy câu |
 
 Trạng thái phòng đối kháng (WAITING / IN_PROGRESS / FINISHED) và tiến trình đối thủ đồng bộ thời gian thực qua Firestore `battle_rooms` — app nghe trực tiếp collection này sau khi phòng được tạo qua API.
 

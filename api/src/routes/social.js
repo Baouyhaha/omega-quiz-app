@@ -20,7 +20,7 @@ router.get('/friends', (req, res) => {
     }
     if (f.status === 'PENDING' && f.userB === uid) {
       const from = db.users.get(f.userA);
-      pending.push({ id: f.id, from: from ? { uid: from.uid, name: from.name, email: from.email } : null });
+      pending.push({ id: f.id, from: from ? { uid: from.uid, name: from.name, email: from.email, rankScore: from.rankScore } : null });
     }
   }
   ok(res, { friends, pendingRequests: pending });
@@ -54,6 +54,19 @@ router.post('/friends/requests/:id/accept', (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Huy loi moi da gui hoac tu choi loi moi nhan duoc (chi khi con PENDING)
+router.delete('/friends/requests/:id', (req, res, next) => {
+  try {
+    const f = db.friendships.get(req.params.id);
+    if (!f || f.status !== 'PENDING') throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy lời mời đang chờ');
+    if (f.userA !== req.user.uid && f.userB !== req.user.uid) {
+      throw new ApiError(403, 'FORBIDDEN', 'Không có quyền xử lý lời mời này');
+    }
+    db.friendships.delete(f.id);
+    ok(res, null, f.userA === req.user.uid ? 'Đã hủy lời mời kết bạn' : 'Đã từ chối lời mời kết bạn');
+  } catch (e) { next(e); }
+});
+
 router.delete('/friends/:userId', (req, res) => {
   db.friendships.delete(`${req.user.uid}:${req.params.userId}`);
   db.friendships.delete(`${req.params.userId}:${req.user.uid}`);
@@ -65,6 +78,59 @@ const battleView = (r) => ({
   id: r.id, code: r.code, topicId: r.topicId, hostId: r.hostId, guestId: r.guestId,
   status: r.status, questionCount: r.questionIds.length,
   ready: r.ready, results: r.results || null, createdAt: r.createdAt,
+  players: [r.hostId, r.guestId].filter(Boolean).map((uid) => {
+    const u = db.users.get(uid);
+    return {
+      uid, name: u ? u.name : uid,
+      ready: !!(r.ready && r.ready[uid]),
+      submitted: !!(r.submissions && r.submissions[uid]),
+      answeredCount: (r.progress && r.progress[uid]) || 0,
+    };
+  }),
+});
+
+const findRoom = (key) => db.battleRooms.get(key) ||
+  [...db.battleRooms.values()].find((r) => r.code === String(key).toUpperCase());
+
+// Xem trang thai phong (app goi lap lai de biet tran da bat dau chua,
+// tien do doi thu, ket qua); vao tran roi ma chua co luot lam thi tao luon
+// va tra cau hoi (khong kem dap an dung)
+router.get('/battles/:id', (req, res, next) => {
+  try {
+    const room = findRoom(req.params.id);
+    if (!room) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy phòng');
+    if (room.hostId !== req.user.uid && room.guestId !== req.user.uid) {
+      throw new ApiError(403, 'FORBIDDEN', 'Bạn không ở trong phòng này');
+    }
+    let questions = null;
+    let attemptId = null;
+    if (room.status === 'IN_PROGRESS') {
+      room.attemptByUser = room.attemptByUser || {};
+      if (!room.attemptByUser[req.user.uid]) {
+        const attempt = startAttempt(req.user, null, room.questionIds, { topicId: room.topicId, battleId: room.id });
+        room.attemptByUser[req.user.uid] = attempt.id;
+      }
+      attemptId = room.attemptByUser[req.user.uid];
+      const attempt = db.attempts.get(attemptId);
+      questions = attempt.questionIds.map((id) => publicQuestion(db.questions.get(id)));
+    }
+    ok(res, { ...battleView(room), attemptId, questions });
+  } catch (e) { next(e); }
+});
+
+// Bao tien do lam bai cua minh de doi thu thay (MH-16: "doi thu da lam 5/20 cau")
+router.post('/battles/:id/progress', (req, res, next) => {
+  try {
+    const room = findRoom(req.params.id);
+    if (!room) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy phòng');
+    if (room.hostId !== req.user.uid && room.guestId !== req.user.uid) {
+      throw new ApiError(403, 'FORBIDDEN', 'Bạn không ở trong phòng này');
+    }
+    const n = Math.max(0, Math.min(room.questionIds.length, Number((req.body || {}).answeredCount) || 0));
+    room.progress = room.progress || {};
+    room.progress[req.user.uid] = n;
+    ok(res, battleView(room), 'Đã cập nhật tiến độ');
+  } catch (e) { next(e); }
 });
 
 router.post('/battles', (req, res, next) => {
