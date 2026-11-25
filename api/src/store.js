@@ -1,17 +1,20 @@
-// Kho du lieu: Map trong bo nho + dong bo Firestore (Firebase Admin SDK).
+// Lop luu tru cua Web API Omega Quiz — Firestore la noi luu tru chinh.
 //
-// Cac route chi doc/ghi qua cac Map o day nen khong doi gi o route:
-//   - Khong co FIREBASE_SERVICE_ACCOUNT: chay y nhu cu (bo nho + seed,
-//     restart la reset, token dev). Khong anh huong ai chua co key.
-//   - Co key: khi server khoi dong, initDb() nap toan bo 17 collection tu
-//     Firestore vao bo nho (neu Firestore trong thi day du lieu mau len).
-//     Sau do moi lan .set()/.delete() tren Map se ghi thang len Firestore;
-//     cac thay doi sua tai cho (PATCH, doi trang thai) duoc day len theo
-//     vong dong bo dinh ky 30 giay (xem server.js) hoac POST /api/dev/sync.
+// Hai che do, chon tu dong theo bien moi truong FIREBASE_SERVICE_ACCOUNT:
+//   - Co khoa dich vu: moi thao tac doc/ghi di THANG xuong Firestore
+//     (qua repo o duoi). Tat server mo lai du lieu van con nguyen.
+//     Lan chay dau tien, collection nao dang trong se duoc nap du lieu
+//     mau (seed) vao collection do.
+//   - Khong co khoa: chay bang bo nho + du lieu mau nhu ban dev cu,
+//     restart la ve trang thai ban dau. Dung de test o may chua co key.
 //
-// Che do dev: token dang "dev:<uid>" (vd "dev:uy") de test khong can
-// Firebase Auth that. Khi co bien moi truong FIREBASE_SERVICE_ACCOUNT
-// (duong dan file JSON khoa dich vu) thi auth.js xac thuc token that.
+// Cac route KHONG cham vao Firestore hay Map truc tiep nua — tat ca di
+// qua repo (get/has/all/entries/put/del/count, deu la async). Sua mot
+// document xong phai goi repo.put de ghi lai (che do Firestore khong
+// tu luu thay doi tai cho nhu Map trong bo nho).
+//
+// Du lieu mau (seed) van xay trong bo nho truoc (seedMemory), roi chi
+// duoc day len Firestore khi collection tuong ung dang trong.
 
 const { newId, nowISO } = require('./util');
 const { firestore, firebaseEnabled } = require('./firebase');
@@ -22,116 +25,9 @@ const COLLECTIONS = [
   'battleRooms', 'contests', 'contestEntries', 'reviews', 'favorites', 'comments',
 ];
 
-// Map tu dong ghi thang len Firestore khi dong bo dang bat (syncOn).
-// Doc van dong bo tu bo nho nen route khong can doi thanh async.
-let syncOn = false;
-
-class SyncedMap extends Map {
-  constructor(name) {
-    super();
-    this.name = name;
-  }
-
-  set(key, value) {
-    super.set(key, value);
-    if (syncOn && firebaseEnabled) {
-      firestore.collection(this.name).doc(String(key)).set(value)
-        .catch((e) => console.error(`[firestore] set ${this.name}/${key} loi:`, e.message));
-    }
-    return this;
-  }
-
-  delete(key) {
-    const had = super.delete(key);
-    if (had && syncOn && firebaseEnabled) {
-      firestore.collection(this.name).doc(String(key)).delete()
-        .catch((e) => console.error(`[firestore] delete ${this.name}/${key} loi:`, e.message));
-    }
-    return had;
-  }
-}
-
+// Map trong bo nho: chua du lieu mau + la noi luu tru o che do khong khoa
 const db = {};
-for (const c of COLLECTIONS) db[c] = new SyncedMap(c);
-
-// Day toan bo bo nho len Firestore (theo lo 400, gioi han batch la 500).
-// Khong bao gio nem loi ra ngoai: ghi loi chi in log de server khong chet.
-async function flushDb() {
-  if (!firebaseEnabled) return;
-  for (const c of COLLECTIONS) {
-    const docs = [...db[c].entries()];
-    for (let i = 0; i < docs.length; i += 400) {
-      const batch = firestore.batch();
-      for (const [key, value] of docs.slice(i, i + 400)) {
-        batch.set(firestore.collection(c).doc(String(key)), value);
-      }
-      try {
-        await batch.commit();
-      } catch (e) {
-        console.error(`[firestore] flush ${c} loi:`, e.message);
-      }
-    }
-  }
-}
-
-async function clearFirestoreCollection(name) {
-  const snap = await firestore.collection(name).get();
-  if (snap.empty) return;
-  for (let i = 0; i < snap.docs.length; i += 400) {
-    const batch = firestore.batch();
-    for (const d of snap.docs.slice(i, i + 400)) batch.delete(d.ref);
-    await batch.commit();
-  }
-}
-
-// Nap Firestore vao bo nho truoc khi server nhan request (server.js goi).
-// Khong nem loi: neu khong nap duoc thi chay bang du lieu mau trong bo nho,
-// dong bo giu tat cho den lan khoi dong sau.
-async function initDb() {
-  if (!firebaseEnabled) return;
-  try {
-    let hasData = false;
-    const loaded = {};
-    for (const c of COLLECTIONS) {
-      const snap = await firestore.collection(c).get();
-      loaded[c] = snap.docs.map((d) => [d.id, d.data()]);
-      if (loaded[c].length > 0) hasData = true;
-    }
-    if (hasData) {
-      for (const c of COLLECTIONS) {
-        db[c].clear();
-        for (const [id, data] of loaded[c]) db[c].set(id, data);
-      }
-      console.log('[firestore] da nap du lieu that vao bo nho');
-    } else {
-      await flushDb();
-      console.log('[firestore] dang trong — da day du lieu mau len');
-    }
-    syncOn = true;
-  } catch (e) {
-    console.error('[firestore] khong nap duoc du lieu:', e.message, '— chay bang du lieu mau trong bo nho');
-  }
-}
-
-// Reset du lieu kiem thu ve du lieu mau (endpoint POST /api/dev/reset).
-// Khi co Firebase: xoa sach 17 collection tren Firestore roi moi nap lai
-// du lieu mau, de lan khoi dong sau khong nap lai du lieu cu.
-async function resetDb() {
-  const wasOn = syncOn;
-  syncOn = false;
-  if (firebaseEnabled && wasOn) {
-    for (const c of COLLECTIONS) {
-      try {
-        await clearFirestoreCollection(c);
-      } catch (e) {
-        console.error(`[firestore] xoa ${c} loi:`, e.message);
-      }
-    }
-  }
-  seedMemory();
-  if (firebaseEnabled && wasOn) await flushDb();
-  syncOn = wasOn;
-}
+for (const c of COLLECTIONS) db[c] = new Map();
 
 function seedMemory() {
   for (const c of COLLECTIONS) db[c].clear();
@@ -282,5 +178,90 @@ function seedMemory() {
   toanQs.forEach((q, i) => db.examQuestions.set(`${exam.id}:${q.id}`, { examId: exam.id, questionId: q.id, order: i }));
 }
 
-seedMemory();
-module.exports = { db, resetDb, initDb, flushDb };
+// ---------- Lop truy cap du lieu (repo) ----------
+const repo = {
+  async get(coll, key) {
+    if (!firebaseEnabled) return db[coll].get(key);
+    const snap = await firestore.collection(coll).doc(String(key)).get();
+    return snap.exists ? snap.data() : undefined;
+  },
+  async has(coll, key) {
+    if (!firebaseEnabled) return db[coll].has(key);
+    const snap = await firestore.collection(coll).doc(String(key)).get();
+    return snap.exists;
+  },
+  async all(coll) {
+    if (!firebaseEnabled) return [...db[coll].values()];
+    const snap = await firestore.collection(coll).get();
+    return snap.docs.map((d) => d.data());
+  },
+  async entries(coll) {
+    if (!firebaseEnabled) return [...db[coll].entries()];
+    const snap = await firestore.collection(coll).get();
+    return snap.docs.map((d) => [d.id, d.data()]);
+  },
+  async put(coll, key, doc) {
+    if (!firebaseEnabled) { db[coll].set(key, doc); return doc; }
+    await firestore.collection(coll).doc(String(key)).set(doc);
+    return doc;
+  },
+  async del(coll, key) {
+    if (!firebaseEnabled) return db[coll].delete(key);
+    await firestore.collection(coll).doc(String(key)).delete();
+    return true;
+  },
+  async count(coll) {
+    if (!firebaseEnabled) return db[coll].size;
+    const snap = await firestore.collection(coll).get();
+    return snap.size;
+  },
+};
+
+// Day du lieu mau cua mot collection len Firestore (theo lo 400, gioi han
+// batch cua Firestore la 500)
+async function pushSeedCollection(coll) {
+  const entries = [...db[coll].entries()];
+  for (let i = 0; i < entries.length; i += 400) {
+    const batch = firestore.batch();
+    for (const [k, v] of entries.slice(i, i + 400)) {
+      batch.set(firestore.collection(coll).doc(String(k)), v);
+    }
+    await batch.commit();
+  }
+}
+
+// Khoi tao luc server bat dau: xay du lieu mau trong bo nho; o che do
+// Firestore thi collection nao dang trong se nhan du lieu mau
+async function initStore() {
+  seedMemory();
+  if (!firebaseEnabled) {
+    console.log('[store] che do bo nho (chua co khoa dich vu) — du lieu mau san sang');
+    return;
+  }
+  let seeded = 0;
+  for (const c of COLLECTIONS) {
+    const snap = await firestore.collection(c).limit(1).get();
+    if (snap.empty && db[c].size) { await pushSeedCollection(c); seeded++; }
+  }
+  console.log(seeded
+    ? `[firestore] da nap du lieu mau vao ${seeded} collection dang trong`
+    : '[firestore] dung du lieu that dang co tren Firestore');
+}
+
+// Reset du lieu kiem thu (nut Reset trong hop dong): che do Firestore thi
+// xoa sach 17 collection roi nap lai du lieu mau
+async function resetStore() {
+  seedMemory();
+  if (!firebaseEnabled) return;
+  for (const c of COLLECTIONS) {
+    const snap = await firestore.collection(c).get();
+    for (let i = 0; i < snap.docs.length; i += 400) {
+      const batch = firestore.batch();
+      snap.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+    await pushSeedCollection(c);
+  }
+}
+
+module.exports = { repo, initStore, resetStore, COLLECTIONS };
