@@ -129,6 +129,9 @@ Trạng thái phòng đối kháng (WAITING / IN_PROGRESS / FINISHED) và tiến
 | POST | `admin/users/{id}/subscription` | Gán hoặc gia hạn gói thủ công: `{ "planId": "..." }` |
 | GET | `admin/plans` / PUT | `admin/plans/{id}` | Xem / sửa cấu hình gói và hạn mức |
 | GET | `admin/stats` | Thống kê toàn hệ thống |
+| GET | `admin/stats/exams` | Thống kê theo bộ đề: số lượt làm đã nộp, điểm % trung bình/cao nhất/thấp nhất |
+| GET | `admin/stats/topics` | Thống kê theo chủ đề: số lượt làm đã nộp, điểm % trung bình, tỉ lệ câu đúng |
+| GET | `admin/stats/violations` | Tài khoản có vi phạm gian lận: tổng số vi phạm, số lượt bị tự nộp bài, chi tiết từng lượt |
 
 ### 2.10 Kiểm thử (không thuộc use case nghiệp vụ)
 | Method | Endpoint | Mô tả |

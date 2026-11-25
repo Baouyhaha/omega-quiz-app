@@ -78,4 +78,63 @@ router.get('/admin/stats', (req, res) => {
   });
 });
 
+// Thong ke theo bo de (MH-33): so luot lam da nop, diem % TB/cao nhat/thap nhat
+router.get('/admin/stats/exams', (req, res) => {
+  const done = [...db.attempts.values()].filter((a) => a.examId && a.status !== 'IN_PROGRESS');
+  const list = [...db.exams.values()].map((e) => {
+    const mine = done.filter((a) => a.examId === e.id);
+    const pcts = mine.map((a) => a.percent || 0);
+    const topic = db.topics.get(e.topicId);
+    return {
+      examId: e.id, title: e.title, topicId: e.topicId, topicName: topic ? topic.name : null,
+      attempts: mine.length,
+      averagePercent: pcts.length ? Math.round(pcts.reduce((s, x) => s + x, 0) / pcts.length * 10) / 10 : null,
+      highestPercent: pcts.length ? Math.max(...pcts) : null,
+      lowestPercent: pcts.length ? Math.min(...pcts) : null,
+    };
+  });
+  ok(res, list);
+});
+
+// Thong ke theo chu de (MH-33): so luot lam da nop, diem % TB, ti le cau dung
+router.get('/admin/stats/topics', (req, res) => {
+  const done = [...db.attempts.values()].filter((a) => a.topicId && a.status !== 'IN_PROGRESS');
+  const list = [...db.topics.values()].map((t) => {
+    const mine = done.filter((a) => a.topicId === t.id);
+    const pcts = mine.map((a) => a.percent || 0);
+    const totalQ = mine.reduce((s, a) => s + (a.questionIds ? a.questionIds.length : 0), 0);
+    const totalRight = mine.reduce((s, a) => s + (a.correctCount || 0), 0);
+    return {
+      topicId: t.id, name: t.name, attempts: mine.length,
+      averagePercent: pcts.length ? Math.round(pcts.reduce((s, x) => s + x, 0) / pcts.length * 10) / 10 : null,
+      correctRatio: totalQ ? Math.round(totalRight / totalQ * 1000) / 1000 : null,
+    };
+  });
+  ok(res, list);
+});
+
+// Tai khoan co vi pham gian lan (MH-33): tong hop tu truong violations cua
+// cac luot lam; forceSubmitted = bi tu nop bai khi du 5 lan vi pham
+router.get('/admin/stats/violations', (req, res) => {
+  const flagged = [...db.attempts.values()].filter((a) => (a.violations || 0) > 0);
+  const byUser = new Map();
+  for (const a of flagged) {
+    if (!byUser.has(a.userId)) byUser.set(a.userId, []);
+    byUser.get(a.userId).push({
+      attemptId: a.id, examId: a.examId, topicId: a.topicId,
+      violations: a.violations, status: a.status,
+    });
+  }
+  const list = [...byUser.entries()].map(([uid, atts]) => {
+    const u = db.users.get(uid);
+    return {
+      uid, name: u ? u.name : uid, email: u ? u.email : null,
+      totalViolations: atts.reduce((s, x) => s + x.violations, 0),
+      forceSubmittedCount: atts.filter((x) => x.status === 'FORCE_SUBMITTED').length,
+      attempts: atts,
+    };
+  }).sort((x, y) => y.totalViolations - x.totalViolations);
+  ok(res, list);
+});
+
 module.exports = router;
