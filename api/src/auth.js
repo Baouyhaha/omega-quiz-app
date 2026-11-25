@@ -11,13 +11,13 @@
 //     gan tay tren Firestore console (xem huong-dan-noi-firebase.md).
 const { db } = require('./store');
 const { ApiError } = require('./util');
-const { admin, firebaseEnabled } = require('./firebase');
+const { auth, firebaseEnabled } = require('./firebase');
 
 async function verifyToken(token) {
   if (token && token.startsWith('dev:')) return token.slice(4);
   if (firebaseEnabled && token) {
     try {
-      const decoded = await admin.auth().verifyIdToken(token);
+      const decoded = await auth.verifyIdToken(token);
       return decoded.uid;
     } catch (e) {
       return null;
