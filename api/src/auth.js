@@ -1,16 +1,28 @@
 // Xac thuc nguoi dung tu header Authorization: Bearer <token>.
 //
-// Che do hien tai (phat trien): token dang "dev:<uid>", vi du "dev:uy".
-// Khi noi Firebase that: cai firebase-admin, nap khoa dich vu qua bien
-// FIREBASE_SERVICE_ACCOUNT, roi thay ham verifyToken() bang
-// admin.auth().verifyIdToken(token) va lay uid tu ket qua.
+// Hai dang token deu chap nhan:
+//   - "dev:<uid>" (vd "dev:uy"): token dev, dung de test o may ca nhan.
+//     Chi ton tai khi chay API, khong lien quan toi Firebase Auth.
+//   - Token Firebase that (ID token cua Firebase Auth): chi chap nhan khi
+//     server da noi Firebase (bien FIREBASE_SERVICE_ACCOUNT). verifyIdToken
+//     tra ve uid that cua Firebase Auth — uid nay KHAC uid dev ("uy",
+//     "dinh"...), nen lan dang nhap dau tien bang token that se tao ho so
+//     moi (xem POST /auth/login). Quyen ADMIN cho tai khoan that phai duoc
+//     gan tay tren Firestore console (xem huong-dan-noi-firebase.md).
 const { db } = require('./store');
 const { ApiError } = require('./util');
+const { admin, firebaseEnabled } = require('./firebase');
 
 async function verifyToken(token) {
   if (token && token.startsWith('dev:')) return token.slice(4);
-  // ponytail: chua noi Firebase Admin — token that se bi tu choi cho den
-  // khi verifyIdToken duoc nap vao day.
+  if (firebaseEnabled && token) {
+    try {
+      const decoded = await admin.auth().verifyIdToken(token);
+      return decoded.uid;
+    } catch (e) {
+      return null;
+    }
+  }
   return null;
 }
 
