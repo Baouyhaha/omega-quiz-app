@@ -11,7 +11,14 @@
 /// Chức năng thật: T22 nối chống gian lận (đếm rời app + tự nộp đủ 5 lần);
 ///   T23 hiện câu hỏi thật từ API + chọn đáp án + chuyển câu (phục vụ
 ///   nộp bài — câu hỏi phát từ server KHÔNG kèm đáp án đúng/giải thích).
-///   Đồng hồ đếm ngược + Tip/Trợ giúp vẫn mock, thuộc task làm bài.
+///   T21: đồng hồ đếm ngược chạy thật (theo durationMinutes của đề) +
+///   hết giờ tự nộp + đo thời gian từng câu để tính thưởng tốc độ.
+///   Tip/Trợ giúp vẫn mock.
+///   T21 là task làm bài (thẻ Trello "T21 — Làm bài: timer + nộp +
+///   chấm", hạn 23/11 21:00) — MH-09 thuộc T21, còn MH-16 (đối kháng)
+///   và MH-17 (đợt thi) chỉ là điểm VÀO MH-09, không phải task làm MH-09.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -34,6 +41,11 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
   bool _daRoiApp = false;
   // Vị trí câu đang xem trong danh sách đề (0 = câu đầu).
   int _cauHienTai = 0;
+  // Đồng hồ đếm ngược (T21): tick mỗi giây để hiện giờ còn lại + đo
+  // thời gian từng câu + phát hiện hết giờ để tự nộp.
+  Timer? _dongHo;
+  // Đang tự nộp do hết giờ — chặn tick tiếp theo nộp trùng.
+  bool _dangTuNop = false;
 
   @override
   void initState() {
@@ -50,6 +62,7 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
 
   @override
   void dispose() {
+    _dongHo?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -62,6 +75,9 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
             'exam_giuaky';
     try {
       await context.read<ExamAttemptViewModel>().startAttempt(examId);
+      if (!mounted) return;
+      // Lượt làm đã bắt đầu — chạy đồng hồ đếm ngược (T21).
+      _batDauDongHo();
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -73,6 +89,89 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
               'Không bắt đầu được lượt làm. Kiểm tra API local đã chạy chưa.')));
     }
   }
+
+  /// Chạy đồng hồ đếm ngược (T21): tick mỗi giây để cập nhật giờ hiển
+  /// thị và tự nộp khi hết giờ. Đồng hồ tính theo giờ thực
+  /// (ViewModel.soGiayConLai) nên xoay màn hình hay thoát app rồi quay
+  /// lại cũng không chạy sai — thời gian nền vẫn tính như thi thật.
+  /// Thời gian từng câu KHÔNG đo ở đây: tick mỗi giây sẽ bỏ sót câu
+  /// làm dưới 1 giây, làm server không tính được thưởng tốc độ — đo
+  /// bằng mốc giờ vào/rời câu trong ViewModel (chuyenSangCau).
+  void _batDauDongHo() {
+    _dongHo?.cancel();
+    _dangTuNop = false;
+    _dongHo = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      final vm = context.read<ExamAttemptViewModel>();
+      // Lượt làm đã kết thúc (đã nộp / bị nộp) thì dừng đồng hồ.
+      if (vm.status != AttemptStatus.inProgress) {
+        _dongHo?.cancel();
+        return;
+      }
+      setState(() {}); // cập nhật giờ còn lại trên AppBar.
+      if (vm.soGiayConLai <= 0) _hetGioTuNop();
+    });
+  }
+
+  /// Chuyển sang câu [cauMoi]: báo ViewModel chốt thời gian câu cũ và
+  /// bắt đầu tính giờ câu mới (để tính thưởng tốc độ), rồi mới đổi
+  /// câu hiển thị.
+  void _chuyenCau(int cauMoi) {
+    final vm = context.read<ExamAttemptViewModel>();
+    vm.chuyenSangCau(vm.questions[cauMoi]['id'] as String);
+    setState(() => _cauHienTai = cauMoi);
+  }
+
+  /// Hết giờ: phát tiếng chuông, nộp bài ngay (hệ thống tự nộp, không
+  /// đợi bấm nút), rồi hiện hộp báo + sang MH-10 với kết quả thật.
+  /// Nộp lỗi (mất mạng...) thì ở lại màn + báo lỗi để nộp tay bằng nút
+  /// Nộp bài — không để bài làm kẹt ở trạng thái chưa nộp.
+  Future<void> _hetGioTuNop() async {
+    if (_dangTuNop) return;
+    _dangTuNop = true;
+    _dongHo?.cancel();
+    // T13: tiếng chuông khi hết giờ tự nộp.
+    SoundService.instance.playTimeout();
+    final vm = context.read<ExamAttemptViewModel>();
+    try {
+      final ketQua = await vm.submit();
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AlertDialog(
+          title: const Text('Hết giờ làm bài'),
+          content: const Text('Đã hết thời gian, bài làm đã tự nộp.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Xem kết quả'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      Navigator.pushNamed(
+        context,
+        '/mh10',
+        arguments: {...ketQua, 'examId': vm.examId},
+      );
+    } on ApiException catch (e) {
+      _dangTuNop = false;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      _dangTuNop = false;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Hết giờ nhưng chưa nộp được. Bấm Nộp bài để nộp tay.')));
+    }
+  }
+
+  /// Định dạng giây còn lại thành "m:ss" (ví dụ 125 → "2:05").
+  String _dinhDangConLai(int giay) =>
+      '${giay ~/ 60}:${(giay % 60).toString().padLeft(2, '0')}';
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -195,19 +294,21 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
         centerTitle: true,
         title: Text('Câu ${_cauHienTai + 1}/$total'),
         actions: [
-          // Đồng hồ đếm ngược — chạy thật ở task làm bài.
+          // Đồng hồ đếm ngược thật (T21): giờ còn lại theo
+          // durationMinutes của đề; còn dưới 1 phút thì đỏ.
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Row(
               children: [
-                const Icon(Icons.timer_outlined,
-                    size: 20, color: kTextPrimary),
+                Icon(Icons.timer_outlined,
+                    size: 20,
+                    color: vm.soGiayConLai < 60 ? kError : kTextPrimary),
                 const SizedBox(width: 4),
-                Text('12:34',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(color: kTextPrimary)),
+                Text(_dinhDangConLai(vm.soGiayConLai),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: vm.soGiayConLai < 60
+                            ? kError
+                            : kTextPrimary)),
               ],
             ),
           ),
@@ -278,14 +379,14 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
               children: [
                 TextButton.icon(
                   onPressed: _cauHienTai > 0
-                      ? () => setState(() => _cauHienTai--)
+                      ? () => _chuyenCau(_cauHienTai - 1)
                       : null,
                   icon: const Icon(Icons.chevron_left),
                   label: const Text('Câu trước'),
                 ),
                 TextButton.icon(
                   onPressed: _cauHienTai < total - 1
-                      ? () => setState(() => _cauHienTai++)
+                      ? () => _chuyenCau(_cauHienTai + 1)
                       : null,
                   icon: const Icon(Icons.chevron_right),
                   label: const Text('Câu sau'),
