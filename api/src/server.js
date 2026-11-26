@@ -3,7 +3,7 @@
 const express = require('express');
 const cors = require('cors');
 const { ApiError } = require('./util');
-const { resetDb, initDb, flushDb } = require('./store');
+const { initStore, resetStore } = require('./store');
 const { firebaseEnabled } = require('./firebase');
 
 const app = express();
@@ -14,25 +14,24 @@ app.get('/api/health', (req, res) => res.json({ success: true, message: 'OK', da
 
 // Nut Reset du lieu kiem thu (hop dong muc 2.10) — dat truoc cac router
 // vi cac router phia duoi dung authMiddleware o cap router.
-// Khi co Firebase: reset ca du lieu tren Firestore roi moi nap lai du lieu mau.
+// Che do Firestore: reset ca du lieu tren Firestore roi nap lai du lieu mau.
 app.post('/api/dev/reset', async (req, res, next) => {
   try {
-    await resetDb();
+    await resetStore();
     res.json({ success: true, message: 'Đã reset dữ liệu kiểm thử về trạng thái ban đầu', data: null });
   } catch (e) { next(e); }
 });
 
-// Day toan bo du lieu trong bo nho len Firestore (chi co tac dung khi
-// Firebase da bat). Dung khi muon chac du lieu tren console la moi nhat
-// thay vi doi vong dong bo 30 giay.
-app.post('/api/dev/sync', async (req, res, next) => {
-  try {
-    if (!firebaseEnabled) {
-      return res.json({ success: true, message: 'Firebase chưa bật — API đang chạy bằng bộ nhớ, không có gì để đồng bộ', data: null });
-    }
-    await flushDb();
-    res.json({ success: true, message: 'Đã đồng bộ dữ liệu lên Firestore', data: null });
-  } catch (e) { next(e); }
+// De tuong thich nguoc cho ban app cu tung goi endpoint nay: du lieu gio
+// ghi thang xuong Firestore ngay khi thay doi nen khong con buoc dong bo.
+app.post('/api/dev/sync', (req, res) => {
+  res.json({
+    success: true,
+    message: firebaseEnabled
+      ? 'Dữ liệu đã được ghi thẳng xuống Firestore, không cần đồng bộ nữa'
+      : 'Firebase chưa bật — API đang chạy bằng bộ nhớ, không có gì để đồng bộ',
+    data: null,
+  });
 });
 
 app.use('/api', require('./routes/auth'));
@@ -58,24 +57,12 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 
-// Nap du lieu Firestore vao bo nho truoc khi nhan request. Neu khong co
-// Firebase thi initDb() khong lam gi va server chay nhu cu.
+// Khoi tao lop luu tru truoc khi nhan request: che do Firestore thi nap
+// du lieu mau vao cac collection dang trong; che do bo nho thi dung ngay
+// du lieu mau da xay san.
 async function start() {
-  await initDb();
+  await initStore();
   app.listen(PORT, () => console.log(`Omega Quiz API dang chay tai http://localhost:${PORT}/api/`));
-  if (firebaseEnabled) {
-    // Dong bo dinh ky: bat cac thay doi sua tai cho (PATCH, doi trang thai)
-    // ma lop Map khong tu day len Firestore duoc.
-    setInterval(() => {
-      flushDb().catch((e) => console.error('[firestore] dong bo dinh ky loi:', e.message));
-    }, 30 * 1000);
-    const shutdown = async () => {
-      try { await flushDb(); } catch (e) { /* bo qua loi khi tat */ }
-      process.exit(0);
-    };
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
-  }
 }
 
 start();

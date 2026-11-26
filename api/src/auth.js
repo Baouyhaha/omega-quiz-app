@@ -9,15 +9,18 @@
 //     "dinh"...), nen lan dang nhap dau tien bang token that se tao ho so
 //     moi (xem POST /auth/login). Quyen ADMIN cho tai khoan that phai duoc
 //     gan tay tren Firestore console (xem huong-dan-noi-firebase.md).
-const { db } = require('./store');
+//
+// Moi ham doc du lieu o day deu la async vi du lieu doc qua repo
+// (Firestore hoac bo nho — xem store.js).
+const { repo } = require('./store');
 const { ApiError } = require('./util');
-const { admin, firebaseEnabled } = require('./firebase');
+const { auth, firebaseEnabled } = require('./firebase');
 
 async function verifyToken(token) {
   if (token && token.startsWith('dev:')) return token.slice(4);
   if (firebaseEnabled && token) {
     try {
-      const decoded = await admin.auth().verifyIdToken(token);
+      const decoded = await auth.verifyIdToken(token);
       return decoded.uid;
     } catch (e) {
       return null;
@@ -33,7 +36,7 @@ async function authMiddleware(req, res, next) {
     if (!token) throw new ApiError(401, 'UNAUTHORIZED', 'Thiếu token đăng nhập');
     const uid = await verifyToken(token);
     if (!uid) throw new ApiError(401, 'UNAUTHORIZED', 'Token không hợp lệ');
-    const user = db.users.get(uid);
+    const user = await repo.get('users', uid);
     if (!user) throw new ApiError(401, 'UNAUTHORIZED', 'Tài khoản chưa được tạo, hãy gọi auth/login trước');
     if (user.locked) throw new ApiError(403, 'ACCOUNT_LOCKED', 'Tài khoản đã bị khóa');
     req.user = user;
@@ -54,8 +57,8 @@ const WARNING_MS = 7 * 864e5; // 7 ngay canh bao sau khi het han (Dot 2)
 
 // Trang thai vong doi cua goi: ACTIVE (con han) / WARNING (het han chua
 // qua 7 ngay - van full quyen) / EXPIRED (qua 7 ngay canh bao)
-function subscriptionState(userId) {
-  const sub = db.subscriptions.get(userId);
+async function subscriptionState(userId) {
+  const sub = await repo.get('subscriptions', userId);
   if (!sub || !sub.expiresAt) return { state: 'ACTIVE', sub };
   const now = Date.now();
   const exp = new Date(sub.expiresAt).getTime();
@@ -67,36 +70,39 @@ function subscriptionState(userId) {
 // Het 7 ngay canh bao: xoa chu de PRIVATE cua chu so huu (kem cau hoi, bo
 // de, thanh vien, loi moi), chu de PUBLIC giu lai dang chi-doc. Xu ly lazy
 // khi co request dung toi goi cua nguoi dung, chay mot lan moi dot het han.
-function applyExpiryLifecycle(userId) {
-  const sub = db.subscriptions.get(userId);
+async function applyExpiryLifecycle(userId) {
+  const sub = await repo.get('subscriptions', userId);
   if (!sub || !sub.expiresAt || sub.lifecycleApplied) return;
   if (Date.now() <= new Date(sub.expiresAt).getTime() + WARNING_MS) return;
   sub.lifecycleApplied = true;
-  for (const topic of [...db.topics.values()]) {
+  await repo.put('subscriptions', userId, sub);
+  const topics = await repo.all('topics');
+  for (const topic of topics) {
     if (topic.ownerId !== userId) continue;
     if (topic.visibility === 'PRIVATE') {
-      const examIds = new Set([...db.exams.values()].filter((e) => e.topicId === topic.id).map((e) => e.id));
-      db.topics.delete(topic.id);
-      for (const [k, v] of [...db.questions]) if (v.topicId === topic.id) db.questions.delete(k);
-      for (const [k, v] of [...db.exams]) if (v.topicId === topic.id) db.exams.delete(k);
-      for (const [k, v] of [...db.examQuestions]) if (examIds.has(v.examId)) db.examQuestions.delete(k);
-      for (const [k, v] of [...db.topicMembers]) if (v.topicId === topic.id) db.topicMembers.delete(k);
-      for (const [k, v] of [...db.invitations]) if (v.topicId === topic.id) db.invitations.delete(k);
+      const examIds = new Set((await repo.all('exams')).filter((e) => e.topicId === topic.id).map((e) => e.id));
+      await repo.del('topics', topic.id);
+      for (const [k, v] of await repo.entries('questions')) if (v.topicId === topic.id) await repo.del('questions', k);
+      for (const [k, v] of await repo.entries('exams')) if (v.topicId === topic.id) await repo.del('exams', k);
+      for (const [k, v] of await repo.entries('examQuestions')) if (examIds.has(v.examId)) await repo.del('examQuestions', k);
+      for (const [k, v] of await repo.entries('topicMembers')) if (v.topicId === topic.id) await repo.del('topicMembers', k);
+      for (const [k, v] of await repo.entries('invitations')) if (v.topicId === topic.id) await repo.del('invitations', k);
     } else {
       topic.ownerExpired = true;
+      await repo.put('topics', topic.id, topic);
     }
   }
 }
 
 // Lay goi dang hieu luc: ACTIVE va WARNING deu dung full quyen cua goi;
 // EXPIRED thi ap vong doi roi coi nhu goi mien phi
-function activePlan(userId) {
-  const { state, sub } = subscriptionState(userId);
+async function activePlan(userId) {
+  const { state, sub } = await subscriptionState(userId);
   if (sub && sub.status === 'ACTIVE' && state !== 'EXPIRED') {
-    return { sub, plan: db.plans.get(sub.planId), state };
+    return { sub, plan: await repo.get('plans', sub.planId), state };
   }
-  if (state === 'EXPIRED') applyExpiryLifecycle(userId);
-  return { sub: null, plan: db.plans.get('free'), state };
+  if (state === 'EXPIRED') await applyExpiryLifecycle(userId);
+  return { sub: null, plan: await repo.get('plans', 'free'), state };
 }
 
 // Chu de public cua chu so huu da het han goi (qua 7 ngay canh bao) la
@@ -108,42 +114,42 @@ function assertTopicWritable(topic) {
 }
 
 // Chu de private: chi chu so huu va thanh vien moi truy cap duoc
-function assertTopicAccess(req, topic) {
+async function assertTopicAccess(req, topic) {
   if (topic.visibility !== 'PRIVATE') return;
-  const isMember = db.topicMembers.has(`${topic.id}:${req.user.uid}`);
+  const isMember = await repo.has('topicMembers', `${topic.id}:${req.user.uid}`);
   if (topic.ownerId !== req.user.uid && !isMember) {
     throw new ApiError(403, 'FORBIDDEN', 'Chủ đề riêng tư — chỉ chủ sở hữu và thành viên mới truy cập được');
   }
 }
 
 // Kiem tra han muc truoc thao tac tao (hop dong API muc 1)
-function checkLimit(userId, kind) {
-  const { plan } = activePlan(userId);
+async function checkLimit(userId, kind) {
+  const { plan } = await activePlan(userId);
   if (!plan || !plan.limits) return; // goi thue bao: khong gioi han
   const limits = plan.limits;
   if (kind.type === 'topic') {
-    const count = [...db.topics.values()].filter((t) => t.ownerId === userId).length;
+    const count = (await repo.all('topics')).filter((t) => t.ownerId === userId).length;
     if (count >= limits.maxTopics) {
       throw new ApiError(409, 'LIMIT_EXCEEDED', `Gói miễn phí chỉ tạo tối đa ${limits.maxTopics} chủ đề`);
     }
   }
   if (kind.type === 'exam') {
-    const count = [...db.exams.values()].filter((e) => e.topicId === kind.topicId).length;
+    const count = (await repo.all('exams')).filter((e) => e.topicId === kind.topicId).length;
     if (count >= limits.maxExamsPerTopic) {
       throw new ApiError(409, 'LIMIT_EXCEEDED', `Gói miễn phí chỉ tạo tối đa ${limits.maxExamsPerTopic} bộ đề mỗi chủ đề`);
     }
   }
   if (kind.type === 'member') {
-    const count = [...db.topicMembers.values()].filter((m) => m.topicId === kind.topicId).length;
-    const pending = [...db.invitations.values()].filter((i) => i.topicId === kind.topicId && i.status === 'PENDING').length;
+    const count = (await repo.all('topicMembers')).filter((m) => m.topicId === kind.topicId).length;
+    const pending = (await repo.all('invitations')).filter((i) => i.topicId === kind.topicId && i.status === 'PENDING').length;
     if (count + pending + kind.addCount > limits.maxMembersPerTopic) {
       throw new ApiError(409, 'LIMIT_EXCEEDED', `Gói miễn phí tối đa ${limits.maxMembersPerTopic} thành viên mỗi chủ đề`);
     }
   }
 }
 
-function requireTopicOwner(req, topicId) {
-  const topic = db.topics.get(topicId);
+async function requireTopicOwner(req, topicId) {
+  const topic = await repo.get('topics', topicId);
   if (!topic) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy chủ đề');
   if (topic.ownerId !== req.user.uid) {
     throw new ApiError(403, 'FORBIDDEN', 'Chỉ chủ sở hữu chủ đề mới làm được thao tác này');

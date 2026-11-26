@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 
-let admin = null;
+let auth = null;
 let firestore = null;
 let firebaseEnabled = false;
 
@@ -27,10 +27,12 @@ function loadServiceAccount() {
 try {
   const serviceAccount = loadServiceAccount();
   if (serviceAccount) {
-    const adminLib = require('firebase-admin');
-    adminLib.initializeApp({ credential: adminLib.credential.cert(serviceAccount) });
-    admin = adminLib;
-    firestore = adminLib.firestore();
+    const { initializeApp, cert } = require('firebase-admin/app');
+    const { getFirestore } = require('firebase-admin/firestore');
+    const { getAuth } = require('firebase-admin/auth');
+    initializeApp({ credential: cert(serviceAccount) });
+    auth = getAuth();
+    firestore = getFirestore();
     firebaseEnabled = true;
     console.log('[firebase] da ket noi project ' + (serviceAccount.project_id || '?'));
   } else {
@@ -40,4 +42,4 @@ try {
   console.error('[firebase] khong ket noi duoc (' + e.message + ') — chay che do bo nho + token dev');
 }
 
-module.exports = { admin, firestore, firebaseEnabled };
+module.exports = { auth, firestore, firebaseEnabled };
