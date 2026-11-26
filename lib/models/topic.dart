@@ -41,6 +41,22 @@ class Topic {
     );
   }
 
+  Topic copyWith({String? myRole}) {
+    return Topic(
+      id: id,
+      ownerId: ownerId,
+      name: name,
+      description: description,
+      visibility: visibility,
+      createdAt: createdAt,
+      memberCount: memberCount,
+      examCount: examCount,
+      questionCount: questionCount,
+      myRole: myRole ?? this.myRole,
+      ownerExpired: ownerExpired,
+    );
+  }
+
   bool get isPublic => visibility == 'PUBLIC';
 
   bool get isOwner => myRole == 'OWNER';
