@@ -4,6 +4,8 @@ import '../core/app_theme.dart';
 import '../core/uy_theme.dart';
 import '../models/topic.dart';
 import '../services/topic_service.dart';
+import 'mh03_ho_so_screen.dart';
+import 'mh05_chu_de_screen.dart';
 import 'mh07_danh_sach_bo_de_screen.dart';
 import 'mh20_tao_sua_chu_de_screen.dart';
 
@@ -285,7 +287,9 @@ class _Mh06ChiTietChuDeScreenState extends State<Mh06ChiTietChuDeScreen> {
             height: 52,
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: null,
+              onPressed: readOnly
+                  ? null
+                  : () => _showSnack('Chưa có API tham gia, đang chờ Uy'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimary,
                 disabledBackgroundColor:
@@ -492,32 +496,29 @@ class _Mh06ChiTietChuDeScreenState extends State<Mh06ChiTietChuDeScreen> {
         ),
         unselectedLabelStyle: const TextStyle(fontSize: 11),
         currentIndex: 1,
+        onTap: (i) {
+          if (i == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => Mh05ChuDeScreen(token: widget.token),
+              ),
+            );
+          } else if (i == 4) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const Mh03HoSoScreen(),
+              ),
+            );
+          }
+        },
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            activeIcon: Icon(Icons.home),
-            label: 'Trang chủ',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.layers),
-            activeIcon: Icon(Icons.layers),
-            label: 'Chủ đề',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.emoji_events),
-            activeIcon: Icon(Icons.emoji_events),
-            label: 'Thi đấu',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart),
-            activeIcon: Icon(Icons.bar_chart),
-            label: 'Xếp hạng',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            activeIcon: Icon(Icons.person),
-            label: 'Hồ sơ',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
+          BottomNavigationBarItem(icon: Icon(Icons.layers_outlined), label: 'Chủ đề'),
+          BottomNavigationBarItem(icon: Icon(Icons.emoji_events_outlined), label: 'Thi đấu'),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart_outlined), label: 'Xếp hạng'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Hồ sơ'),
         ],
       ),
     );

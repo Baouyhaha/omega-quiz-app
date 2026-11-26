@@ -1,7 +1,7 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../core/app_theme.dart';
 import '../models/topic.dart';
@@ -27,7 +27,6 @@ class _Mh20TaoSuaChuDeScreenState extends State<Mh20TaoSuaChuDeScreen> {
   bool _saving = false;
   String? _error;
   File? _coverImage;
-  final ImagePicker _picker = ImagePicker();
 
   bool get _isEdit => widget.topic != null;
 
@@ -49,9 +48,10 @@ class _Mh20TaoSuaChuDeScreenState extends State<Mh20TaoSuaChuDeScreen> {
   }
 
   Future<void> _pickCover() async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery);
-    if (picked != null && mounted) {
-      setState(() => _coverImage = File(picked.path));
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    final path = result?.files.single.path;
+    if (path != null && mounted) {
+      setState(() => _coverImage = File(path));
     }
   }
 
@@ -217,23 +217,27 @@ class _Mh20TaoSuaChuDeScreenState extends State<Mh20TaoSuaChuDeScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                RadioListTile<bool>(
-                  contentPadding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  title: const Text('Công khai — ai cũng xem được'),
-                  value: true,
+                RadioGroup<bool>(
                   groupValue: _isPublic,
-                  activeColor: kPrimary,
                   onChanged: (v) => setState(() => _isPublic = v ?? true),
-                ),
-                RadioListTile<bool>(
-                  contentPadding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
-                  title: const Text('Riêng tư — chỉ thành viên'),
-                  value: false,
-                  groupValue: _isPublic,
-                  activeColor: kPrimary,
-                  onChanged: (v) => setState(() => _isPublic = v ?? true),
+                  child: Column(
+                    children: [
+                      RadioListTile<bool>(
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        title: const Text('Công khai — ai cũng xem được'),
+                        value: true,
+                        fillColor: WidgetStatePropertyAll(kPrimary),
+                      ),
+                      RadioListTile<bool>(
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        title: const Text('Riêng tư — chỉ thành viên'),
+                        value: false,
+                        fillColor: WidgetStatePropertyAll(kPrimary),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Container(

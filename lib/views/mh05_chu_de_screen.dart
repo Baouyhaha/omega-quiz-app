@@ -137,10 +137,12 @@ class _Mh05ChuDeScreenState extends State<Mh05ChuDeScreen> {
               width: 96,
               height: 36,
               child: ElevatedButton(
-                onPressed: null,
+                onPressed: () =>
+                    _showSnack('Chưa có API tham gia, đang chờ Uy'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEDE9FE),
                   disabledBackgroundColor: const Color(0xFFEDE9FE),
+                  foregroundColor: kPrimary,
                   disabledForegroundColor: kPrimary,
                   padding: EdgeInsets.zero,
                   shape: RoundedRectangleBorder(
