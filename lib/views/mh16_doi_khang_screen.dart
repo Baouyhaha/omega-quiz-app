@@ -156,6 +156,9 @@ class Mh16DoiKhangScreen extends StatelessWidget {
                         child: Text('U', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
                       ),
                       const SizedBox(width: 12),
+                      // Icon rank theo bộ icon T12 (assets/icons/rank/)
+                      Image.asset('assets/icons/rank/rank_ngua.png', width: 36, height: 36),
+                      const SizedBox(width: 8),
                       const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

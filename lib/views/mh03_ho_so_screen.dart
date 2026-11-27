@@ -23,7 +23,7 @@ const _mockHoSo = {
   'hangConVat': 'Ngựa',
   'rankScore': 1240,
   'conLaiLenHang': 260,
-  'hangTiepTheo': 'Hổ',
+  'hangTiepTheo': 'Gấu',
   'tienTrinhHang': 0.13,
   'diemTrungBinh': 8.2,
   'luotLam': 17,
@@ -82,6 +82,9 @@ class _Mh03HoSoScreenState extends State<Mh03HoSoScreen> {
                 children: [
                   Row(
                     children: [
+                      // Icon rank theo bộ icon T12 (assets/icons/rank/)
+                      Image.asset('assets/icons/rank/rank_ngua.png', width: 40, height: 40),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           'Hạng: ${_mockHoSo['hangConVat']}',
