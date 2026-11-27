@@ -78,6 +78,42 @@ class ExamAttemptViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Nhận lượt làm ĐÃ TẠO SẴN từ đợt thi khung giờ (T28): MH-17 gọi
+  /// API vào thi (POST /contests/:id/enter) trước, API tạo lượt làm +
+  /// trả attemptId + đề; MH-09 chỉ nhận lại để làm bài — KHÔNG gọi
+  /// POST exams/{id}/attempts như đề thường.
+  ///
+  /// [soGiayConLaiToiDa]: số giây còn lại tới giờ đóng đợt thi — đồng
+  /// hồ đếm ngược theo số này (hết giờ tự nộp như đề thường, T21).
+  /// examId để null vì lượt đợt thi không gắn với 1 bộ đề cố định
+  /// (nguồn đề có thể là rút ngẫu nhiên từ kho chủ đề).
+  void nhanLuotDotThi({
+    required String attemptIdMoi,
+    required List<Map<String, dynamic>> deThi,
+    required int soGiayConLaiToiDa,
+  }) {
+    attemptId = attemptIdMoi;
+    examId = null;
+    // Đồng hồ tính theo phút (soGiayConLai): làm tròn xuống, tối thiểu
+    // 1 phút — tự nộp sớm hơn giờ đóng vài chục giây là phía an toàn.
+    final phut = soGiayConLaiToiDa ~/ 60;
+    durationMinutes = phut < 1 ? 1 : phut;
+    thoiDiemBatDau = DateTime.now();
+    questions = deThi;
+    selectedAnswers.clear();
+    timePerQuestion.clear();
+    _cauDangLam = null;
+    _thoiDiemVaoCau = null;
+    violations = 0;
+    status = AttemptStatus.inProgress;
+    // Bắt đầu tính giờ câu đầu tiên ngay khi nhận đề.
+    if (questions.isNotEmpty) {
+      _cauDangLam = questions.first['id'] as String;
+      _thoiDiemVaoCau = DateTime.now();
+    }
+    notifyListeners();
+  }
+
   /// Gọi khi người làm chuyển sang câu [questionId] (MH-09 gọi ở nút
   /// Câu trước/Câu sau): chốt thời gian câu cũ rồi bắt đầu tính giờ
   /// câu mới. Không gọi notifyListeners vì không có giao diện nào

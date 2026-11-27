@@ -70,10 +70,14 @@ class _Mh10NoiDungState extends State<_Mh10NoiDung> {
     final vm = context.read<KetQuaViewModel>();
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is Map) {
-      if (args['examId'] != null && args['correctCount'] != null) {
+      if (args['correctCount'] != null) {
         // Vừa nộp xong (từ MH-09b): kết quả đầy đủ + examId đã gộp.
+        // Lượt đợt thi (T28) không có examId — bỏ qua bước lấy settings
+        // của đề: điểm hiện bình thường, quyền xem lại do server quyết
+        // ở endpoint review (lượt đợt thi luôn được xem lại).
         vm.nhanKetQuaVuaNop(Map<String, dynamic>.from(args));
-        await vm.taiCaiDatDe(args['examId'] as String);
+        final examIdVuaNop = args['examId'] as String?;
+        if (examIdVuaNop != null) await vm.taiCaiDatDe(examIdVuaNop);
       } else if (args['attemptId'] != null) {
         // Mở từ lịch sử (MH-12): chỉ có attemptId.
         await vm.taiTuLichSu(args['attemptId'] as String);

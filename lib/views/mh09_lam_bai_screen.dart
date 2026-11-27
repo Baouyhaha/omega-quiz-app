@@ -17,6 +17,10 @@
 ///   T21 là task làm bài (thẻ Trello "T21 — Làm bài: timer + nộp +
 ///   chấm", hạn 23/11 21:00) — MH-09 thuộc T21, còn MH-16 (đối kháng)
 ///   và MH-17 (đợt thi) chỉ là điểm VÀO MH-09, không phải task làm MH-09.
+///   T28: nhận lượt làm đã tạo sẵn từ đợt thi khung giờ — MH-17 gọi
+///   API vào thi trước rồi truyền attemptId + đề + giờ đóng đợt qua
+///   arguments dạng Map; MH-09 không tự tạo lượt làm trong trường hợp
+///   này, đồng hồ đếm tới giờ đóng đợt thi.
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -67,14 +71,35 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
     super.dispose();
   }
 
-  /// Tạo lượt làm khi vào màn. Lỗi (hết lượt, API tắt...) thì hiện
-  /// SnackBar để biết lý do thay vì im lặng không đếm được vi phạm.
+  /// Bắt đầu lượt làm khi vào màn. Hai đường vào:
+  /// - Đề thường: arguments là examId (String) — MH-09 tự tạo lượt làm
+  ///   qua API (mở từ menu preview thì dùng đề mẫu 'exam_giuaky').
+  /// - Đợt thi (T28): arguments là Map chứa lượt làm MH-17 đã tạo sẵn
+  ///   qua API vào thi (contestAttemptId + contestQuestions +
+  ///   contestCloseAt) — MH-09 chỉ nhận lại, không tạo lượt mới.
+  /// Lỗi (hết lượt, API tắt...) thì hiện SnackBar để biết lý do thay vì
+  /// im lặng không đếm được vi phạm.
   Future<void> _batDauLuotLam() async {
-    final examId =
-        ModalRoute.of(context)?.settings.arguments as String? ??
-            'exam_giuaky';
+    final args = ModalRoute.of(context)?.settings.arguments;
     try {
-      await context.read<ExamAttemptViewModel>().startAttempt(examId);
+      final vm = context.read<ExamAttemptViewModel>();
+      if (args is Map && args['contestAttemptId'] != null) {
+        // Lượt đợt thi: tính số giây còn lại tới giờ đóng đợt để đặt
+        // đồng hồ đếm ngược (hết giờ tự nộp như đề thường).
+        final dongDot =
+            DateTime.tryParse(args['contestCloseAt'] as String? ?? '');
+        final conLai = dongDot == null
+            ? 30 * 60
+            : dongDot.difference(DateTime.now()).inSeconds;
+        vm.nhanLuotDotThi(
+          attemptIdMoi: args['contestAttemptId'] as String,
+          deThi: List<Map<String, dynamic>>.from(
+              args['contestQuestions'] as List),
+          soGiayConLaiToiDa: conLai,
+        );
+      } else {
+        await vm.startAttempt(args is String ? args : 'exam_giuaky');
+      }
       if (!mounted) return;
       // Lượt làm đã bắt đầu — chạy đồng hồ đếm ngược (T21).
       _batDauDongHo();
