@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
@@ -48,8 +48,8 @@ class _Mh20TaoSuaChuDeScreenState extends State<Mh20TaoSuaChuDeScreen> {
   }
 
   Future<void> _pickCover() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image);
-    final path = result?.files.single.path;
+    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+    final path = image?.path;
     if (path != null && mounted) {
       setState(() => _coverImage = File(path));
     }
