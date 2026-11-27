@@ -280,9 +280,10 @@ class _BangXepHang extends StatelessWidget {
   }
 }
 
-/// Thẻ điểm của tài khoản đang đăng nhập: icon rank + số điểm.
-/// (Uy yêu cầu 27/11: bỏ dòng "Bạn đang là <rank>" và thanh tiến trình
-/// "còn X điểm nữa lên rank sau", chỉ hiện điểm.)
+/// Thẻ điểm của tài khoản đang đăng nhập: icon rank + số điểm +
+/// thanh "còn X điểm nữa lên rank sau".
+/// (Uy yêu cầu 27/11: bỏ chữ "Bạn đang là <rank>", chỉ hiện điểm —
+/// thanh tiến trình lên rank vẫn giữ.)
 class _TheRankCuaToi extends StatelessWidget {
   const _TheRankCuaToi();
 
@@ -292,6 +293,8 @@ class _TheRankCuaToi extends StatelessWidget {
     final diem = vm.diemCuaToi;
     final rank = vm.rankCuaToi;
     if (diem == null || rank == null) return const SizedBox.shrink();
+    final conThieu = pointsToNextRank(diem);
+    final rankSau = tenRankSau(diem);
     final textTheme = Theme.of(context).textTheme;
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -301,13 +304,31 @@ class _TheRankCuaToi extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _AvatarRank(animal: rank),
-            const SizedBox(width: 12),
-            Text('$diem điểm',
-                style:
-                    textTheme.titleMedium?.copyWith(color: kTextPrimary)),
+            Row(
+              children: [
+                _AvatarRank(animal: rank),
+                const SizedBox(width: 12),
+                Text('$diem điểm',
+                    style: textTheme.titleMedium
+                        ?.copyWith(color: kTextPrimary)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            LinearProgressIndicator(
+              value: tienTrinhLenRank(diem),
+              backgroundColor: kProgressTrack,
+              color: animalColor(rank),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              conThieu == null
+                  ? 'Bạn đã đạt rank cao nhất!'
+                  : 'Còn $conThieu điểm nữa lên $rankSau',
+              style: const TextStyle(color: kTextSecondary),
+            ),
           ],
         ),
       ),
