@@ -1,36 +1,38 @@
 // UC11 bo de, UC12 cai dat bo de, UC23 yeu thich
 const router = require('express').Router();
-const { db } = require('../store');
+const { repo } = require('../store');
 const { ok, ApiError, newId, fisherYates, nowISO } = require('../util');
 const { authMiddleware, checkLimit, requireTopicOwner, assertTopicWritable, assertTopicAccess } = require('../auth');
 
-const examView = (e) => ({
-  ...e,
-  questionCount: [...db.examQuestions.values()].filter((x) => x.examId === e.id).length,
-});
+async function examView(e) {
+  const links = await repo.all('examQuestions');
+  return { ...e, questionCount: links.filter((x) => x.examId === e.id).length };
+}
 
 router.use(authMiddleware);
 
-router.get('/topics/:id/exams', (req, res, next) => {
+router.get('/topics/:id/exams', async (req, res, next) => {
   try {
-    const topicOfList = db.topics.get(req.params.id);
+    const topicOfList = await repo.get('topics', req.params.id);
     if (!topicOfList) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy chủ đề');
-    assertTopicAccess(req, topicOfList);
-    ok(res, [...db.exams.values()].filter((e) => e.topicId === req.params.id).map(examView));
+    await assertTopicAccess(req, topicOfList);
+    const list = [];
+    for (const e of (await repo.all('exams')).filter((x) => x.topicId === req.params.id)) list.push(await examView(e));
+    ok(res, list);
   } catch (e) { next(e); }
 });
 
-router.post('/topics/:id/exams', (req, res, next) => {
+router.post('/topics/:id/exams', async (req, res, next) => {
   try {
-    const topic = requireTopicOwner(req, req.params.id);
+    const topic = await requireTopicOwner(req, req.params.id);
     assertTopicWritable(topic);
     const b = req.body || {};
     if (!b.title) throw new ApiError(400, 'VALIDATION_ERROR', 'Thiếu tên bộ đề');
-    checkLimit(req.user.uid, { type: 'exam', topicId: topic.id });
+    await checkLimit(req.user.uid, { type: 'exam', topicId: topic.id });
     let questionIds = [];
     if (b.mode === 'RANDOM') {
       const counts = b.counts || { easy: 8, medium: 7, hard: 5 };
-      const pool = [...db.questions.values()].filter((q) => q.topicId === topic.id);
+      const pool = (await repo.all('questions')).filter((q) => q.topicId === topic.id);
       for (const [diff, n] of Object.entries(counts)) {
         const ofDiff = fisherYates(pool.filter((q) => q.difficulty === diff).map((q) => q.id));
         if (ofDiff.length < n) {
@@ -51,62 +53,71 @@ router.post('/topics/:id/exams', (req, res, next) => {
         showAnswerMode: 'AFTER_CLOSE', publishScore: true,
       },
     };
-    db.exams.set(exam.id, exam);
-    questionIds.forEach((qid, i) => db.examQuestions.set(`${exam.id}:${qid}`, { examId: exam.id, questionId: qid, order: i }));
-    ok(res, examView(exam), 'Đã tạo bộ đề', 201);
+    await repo.put('exams', exam.id, exam);
+    for (let i = 0; i < questionIds.length; i++) {
+      await repo.put('examQuestions', `${exam.id}:${questionIds[i]}`, { examId: exam.id, questionId: questionIds[i], order: i });
+    }
+    ok(res, await examView(exam), 'Đã tạo bộ đề', 201);
   } catch (e) { next(e); }
 });
 
-router.get('/exams/:id', (req, res, next) => {
+router.get('/exams/:id', async (req, res, next) => {
   try {
-    const exam = db.exams.get(req.params.id);
+    const exam = await repo.get('exams', req.params.id);
     if (!exam) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy bộ đề');
-    ok(res, examView(exam));
+    ok(res, await examView(exam));
   } catch (e) { next(e); }
 });
 
-router.patch('/exams/:id', (req, res, next) => {
+router.patch('/exams/:id', async (req, res, next) => {
   try {
-    const exam = db.exams.get(req.params.id);
+    const exam = await repo.get('exams', req.params.id);
     if (!exam) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy bộ đề');
-    assertTopicWritable(requireTopicOwner(req, exam.topicId));
+    assertTopicWritable(await requireTopicOwner(req, exam.topicId));
     const { title, description } = req.body || {};
     if (title !== undefined) exam.title = title;
     if (description !== undefined) exam.description = description;
-    ok(res, examView(exam), 'Đã sửa bộ đề');
+    await repo.put('exams', exam.id, exam);
+    ok(res, await examView(exam), 'Đã sửa bộ đề');
   } catch (e) { next(e); }
 });
 
-router.patch('/exams/:id/settings', (req, res, next) => {
+router.patch('/exams/:id/settings', async (req, res, next) => {
   try {
-    const exam = db.exams.get(req.params.id);
+    const exam = await repo.get('exams', req.params.id);
     if (!exam) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy bộ đề');
-    assertTopicWritable(requireTopicOwner(req, exam.topicId));
+    assertTopicWritable(await requireTopicOwner(req, exam.topicId));
     Object.assign(exam.settings, req.body || {});
-    ok(res, examView(exam), 'Đã lưu cài đặt');
+    await repo.put('exams', exam.id, exam);
+    ok(res, await examView(exam), 'Đã lưu cài đặt');
   } catch (e) { next(e); }
 });
 
-router.post('/exams/:id/favorite', (req, res, next) => {
+router.post('/exams/:id/favorite', async (req, res, next) => {
   try {
-    if (!db.exams.get(req.params.id)) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy bộ đề');
-    db.favorites.set(`${req.user.uid}:${req.params.id}`, { userId: req.user.uid, examId: req.params.id, createdAt: nowISO() });
+    if (!(await repo.get('exams', req.params.id))) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy bộ đề');
+    await repo.put('favorites', `${req.user.uid}:${req.params.id}`, { userId: req.user.uid, examId: req.params.id, createdAt: nowISO() });
     ok(res, null, 'Đã thêm vào yêu thích');
   } catch (e) { next(e); }
 });
 
-router.delete('/exams/:id/favorite', (req, res) => {
-  db.favorites.delete(`${req.user.uid}:${req.params.id}`);
-  ok(res, null, 'Đã bỏ yêu thích');
+router.delete('/exams/:id/favorite', async (req, res, next) => {
+  try {
+    await repo.del('favorites', `${req.user.uid}:${req.params.id}`);
+    ok(res, null, 'Đã bỏ yêu thích');
+  } catch (e) { next(e); }
 });
 
-router.get('/favorites', (req, res) => {
-  const list = [...db.favorites.values()]
-    .filter((f) => f.userId === req.user.uid)
-    .map((f) => db.exams.get(f.examId))
-    .filter(Boolean)
-    .map(examView);
-  ok(res, list);
+router.get('/favorites', async (req, res, next) => {
+  try {
+    const favs = (await repo.all('favorites')).filter((f) => f.userId === req.user.uid);
+    const list = [];
+    for (const f of favs) {
+      const e = await repo.get('exams', f.examId);
+      if (e) list.push(await examView(e));
+    }
+    ok(res, list);
+  } catch (e) { next(e); }
 });
 
 module.exports = router;

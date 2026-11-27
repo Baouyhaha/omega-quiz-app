@@ -7,9 +7,9 @@ import 'app_theme.dart';
 // them mau trang thai/chu va dinh dang nut, o nhap, app bar ma cac man
 // cua Uy can. Chi ap dung qua main_uy_preview.dart (diem chay thu rieng),
 // nen khong anh huong giao dien phan cac ban khac lam.
-const Color kSuccess = Color(0xFF2FBF71);
-const Color kError = Color(0xFFFF5A5F);
-const Color kWarning = Color(0xFFFFB020);
+// 23/11/2026: kSuccess/kError/kWarning da bo khoi file nay vi app_theme.dart
+// (ban cua Danh qua PR #4) da co 3 mau do — de ca hai noi cung dinh nghia
+// se loi bien dich trung ten. kWarning theo ban Figma FF9F1C cua app_theme.
 const Color kTextMain = Color(0xFF2B2B3A);
 const Color kTextSub = Color(0xFF6E6E80);
 

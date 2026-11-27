@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'views/khung_dieu_huong_screen.dart';
 import 'views/mh01_dang_nhap_screen.dart';
 import 'views/mh03_ho_so_screen.dart';
+import 'views/mh05_chu_de_screen.dart';
+import 'views/mh15_ban_be_screen.dart';
 import 'views/mh16_doi_khang_screen.dart';
 import 'views/mh21_quan_ly_thanh_vien_screen.dart';
 import 'views/mh25_tao_sua_bo_de_screen.dart';
@@ -18,6 +20,8 @@ class AppRoutes {
   static const String khung = '/khung';
   static const String mh01 = '/mh01';
   static const String mh03 = '/mh03';
+  static const String mh05 = '/mh05';
+  static const String mh15 = '/mh15';
   static const String mh16 = '/mh16';
   static const String mh21 = '/mh21';
   static const String mh25 = '/mh25';
@@ -31,6 +35,8 @@ Map<String, WidgetBuilder> appRoutes() {
     AppRoutes.khung: (_) => const KhungDieuHuongScreen(),
     AppRoutes.mh01: (_) => const Mh01DangNhapScreen(),
     AppRoutes.mh03: (_) => const Mh03HoSoScreen(),
+    AppRoutes.mh05: (_) => const Mh05ChuDeScreen(token: 'dev:thinh'),
+    AppRoutes.mh15: (_) => const Mh15BanBeScreen(token: 'dev:thinh'),
     AppRoutes.mh16: (_) => const Mh16DoiKhangScreen(),
     AppRoutes.mh21: (_) => const Mh21QuanLyThanhVienScreen(),
     AppRoutes.mh25: (_) => const Mh25TaoSuaBoDeScreen(),

@@ -28,7 +28,7 @@ Khi lỗi: `"success": false`, `"data": null`, `message` là thông điệp ngư
 | Method | Endpoint | Mô tả |
 |---|---|---|
 | POST | `auth/login` | Gửi ID token; tạo hồ sơ lần đầu (users + gói dùng thử 7 ngày), trả hồ sơ + trạng thái gói |
-| GET | `me` | Hồ sơ của tôi: tên, ảnh, rankScore, hạng con vật, điểm trung bình, gói hiện tại |
+| GET | `me` | Hồ sơ của tôi: tên, ảnh, rankScore, hạng con vật, điểm trung bình, gói hiện tại, `attemptCount` (số lượt đã làm), `friendCount` (số bạn bè), `battleWins` (số trận đối kháng thắng) |
 | PATCH | `me` | Cập nhật tên hiển thị, ảnh đại diện |
 
 ### 2.2 Chủ đề và thành viên (UC04–UC08)
@@ -45,6 +45,7 @@ Khi lỗi: `"success": false`, `"data": null`, `message` là thông điệp ngư
 | DELETE | `topics/{id}/members/{userId}` | Xóa thành viên (chỉ chủ sở hữu) |
 | GET | `invitations/mine` | Lời mời đang chờ của tôi (hiện ở trang chủ) |
 | POST | `invitations/{id}/accept` | Chấp nhận lời mời → ghi topic_members |
+| POST | `topics/{id}/join` | Tham gia **chủ đề công khai** (chủ đề riêng tư chỉ vào bằng lời mời → 403): kiểm tra hạn mức thành viên theo gói của chủ sở hữu; đã là thành viên thì trả `alreadyMember: true` |
 | GET | `search?q=` | Tìm chủ đề và bộ đề theo từ khóa |
 
 ### 2.3 Câu hỏi và import Excel (UC09, UC10)
@@ -76,9 +77,10 @@ Khi lỗi: `"success": false`, `"data": null`, `message` là thông điệp ngư
 | POST | `attempts/{id}/helpers` | Dùng quyền trợ giúp: `{ "type": "FIFTY_FIFTY" \| "LIGHT_HINT" \| "VIEW_EXPLANATION" \| "CHANGE_QUESTION" \| "EXTRA_TIME" \| "SAFE_SHIELD", "questionId": "..." }` |
 | POST | `attempts/{id}/violations` | Báo một lần thoát app giữa chừng → trả số lần vi phạm; đủ 5 lần máy chủ tự nộp bài |
 | POST | `attempts/{id}/submit` | Nộp bài: `{ "answers": [{ "questionId": "...", "selectedOption": 0, "timeSpentSeconds": 12 }], "durationSeconds": 742 }` → máy chủ chấm (điểm gốc + thưởng tốc độ), trả kết quả. `timeSpentSeconds` là tùy chọn: thời gian làm từng câu, dùng để tính thưởng tốc độ theo từng câu đúng công thức Đợt 2; không gửi thì tính theo tỷ lệ tổng thời gian |
-| GET | `attempts/mine` | Lịch sử làm bài của tôi |
+| GET | `attempts/mine` | Lịch sử làm bài của tôi (mỗi lượt có `durationSeconds` — thời gian làm bài, `score`, `percent`, `submittedAt`) |
 | GET | `attempts/{id}/review` | Xem lại bài: đáp án đúng + giải thích (chỉ khi cài đặt bộ đề cho phép) |
-| GET | `reviews/wrong` | Danh sách câu tôi từng làm sai (ôn tập) |
+| GET | `reviews/wrong` | Danh sách câu tôi từng làm sai (ôn tập) — trả kèm đáp án đúng + giải thích |
+| DELETE | `reviews/wrong/{questionId}` | Gỡ 1 câu khỏi danh sách câu sai của tôi (ôn tập trả lời đúng tại MH-13 hoặc bấm "Đã nhớ") — gỡ vĩnh viễn; gọi lại khi câu đã gỡ vẫn trả 200 với `removed: false` |
 
 ### 2.6 Bạn bè, đối kháng, đợt thi (UC19–UC21)
 | Method | Endpoint | Mô tả |
@@ -86,11 +88,14 @@ Khi lỗi: `"success": false`, `"data": null`, `message` là thông điệp ngư
 | GET | `friends` | Danh sách bạn bè + lời mời kết bạn đang chờ |
 | POST | `friends/requests` | Gửi lời mời kết bạn: `{ "email": "..." }` |
 | POST | `friends/requests/{id}/accept` | Chấp nhận lời mời kết bạn |
+| DELETE | `friends/requests/{id}` | Hủy lời mời đã gửi / từ chối lời mời nhận được (chỉ khi đang chờ) |
 | DELETE | `friends/{userId}` | Hủy kết bạn |
 | POST | `battles` | Tạo phòng đối kháng 1-1: `{ "topicId": "...", "questionCount": 10 }` — **máy chủ rút ngẫu nhiên câu hỏi từ kho của chủ đề** và chốt vào phòng |
 | POST | `battles/{id}/join` | Vào phòng bằng mã phòng |
 | POST | `battles/{id}/ready` | Sẵn sàng; cả hai sẵn sàng → phòng bắt đầu |
 | POST | `battles/{id}/submit` | Nộp bài trong trận → khi cả hai đã nộp, máy chủ tổng kết và cộng/trừ rankScore (+15/0/−10) |
+| GET | `battles/{id}` | Xem trạng thái phòng (app gọi lặp lại): người chơi + sẵn sàng + tiến độ đối thủ; trận đang diễn ra thì trả kèm câu hỏi (không đáp án) và tạo lượt làm nếu chưa có |
+| POST | `battles/{id}/progress` | Báo tiến độ của mình: `{ "answeredCount": 5 }` để đối thủ thấy đã làm mấy câu |
 
 Trạng thái phòng đối kháng (WAITING / IN_PROGRESS / FINISHED) và tiến trình đối thủ đồng bộ thời gian thực qua Firestore `battle_rooms` — app nghe trực tiếp collection này sau khi phòng được tạo qua API.
 
@@ -126,6 +131,9 @@ Trạng thái phòng đối kháng (WAITING / IN_PROGRESS / FINISHED) và tiến
 | POST | `admin/users/{id}/subscription` | Gán hoặc gia hạn gói thủ công: `{ "planId": "..." }` |
 | GET | `admin/plans` / PUT | `admin/plans/{id}` | Xem / sửa cấu hình gói và hạn mức |
 | GET | `admin/stats` | Thống kê toàn hệ thống |
+| GET | `admin/stats/exams` | Thống kê theo bộ đề: số lượt làm đã nộp, điểm % trung bình/cao nhất/thấp nhất |
+| GET | `admin/stats/topics` | Thống kê theo chủ đề: số lượt làm đã nộp, điểm % trung bình, tỉ lệ câu đúng |
+| GET | `admin/stats/violations` | Tài khoản có vi phạm gian lận: tổng số vi phạm, số lượt bị tự nộp bài, chi tiết từng lượt |
 
 ### 2.10 Kiểm thử (không thuộc use case nghiệp vụ)
 | Method | Endpoint | Mô tả |
