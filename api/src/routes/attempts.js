@@ -266,6 +266,17 @@ router.get('/reviews/wrong', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// DELETE reviews/wrong/{questionId} — go 1 cau khoi danh sach cau sai cua chinh minh
+// (dung khi on tap tra loi dung tai MH-13 hoac bam "Da nho"; go vinh vien, khong phai an tam)
+router.delete('/reviews/wrong/:questionId', async (req, res, next) => {
+  try {
+    const key = `${req.user.uid}:${req.params.questionId}`;
+    const existed = await repo.has('reviews', key);
+    if (existed) await repo.del('reviews', key);
+    ok(res, { questionId: req.params.questionId, removed: existed }, existed ? 'Đã gỡ câu khỏi danh sách câu sai' : 'Câu này không còn trong danh sách câu sai');
+  } catch (e) { next(e); }
+});
+
 module.exports = router;
 module.exports.startAttempt = startAttempt;
 module.exports.examQuestions = examQuestions;

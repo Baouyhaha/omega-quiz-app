@@ -19,6 +19,11 @@ async function profileOf(user) {
     rankScore: user.rankScore,
     animalRank: animalRank(user.rankScore),
     averagePercent: avg,
+    attemptCount: myAttempts.length,
+    friendCount: (await repo.all('friendships')).filter(
+      (f) => f.status === 'ACCEPTED' && (f.userA === user.uid || f.userB === user.uid)).length,
+    battleWins: (await repo.all('battleRooms')).filter(
+      (r) => r.results && r.results.winner === user.uid).length,
     subscription: sub
       ? { planId: sub.planId, planName: plan ? plan.name : sub.planId, expiresAt: sub.expiresAt, status: sub.status }
       : { planId: 'free', planName: 'Miễn phí', expiresAt: null, status: 'ACTIVE' },

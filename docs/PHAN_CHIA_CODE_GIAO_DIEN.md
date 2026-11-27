@@ -21,3 +21,7 @@ MH-20 Tạo/Sửa chủ đề · MH-22 Quản lý câu hỏi · MH-23 Soạn/S�
 - Widget dùng chung nào xuất hiện trong phần của nhiều người: người gặp đầu tiên tạo vào `lib/widgets/` và báo trong Discord; người sau dùng lại, không tạo bản sao.
 - Thứ tự làm: hạ tầng chung (Uy) xong trước để mọi người có khung điều hướng; sau đó mỗi người làm theo thứ tự tầng ưu tiên của cụm mình (màn hình thuộc Tầng 0–1 trước).
 - Nghiệm thu: theo checklist ở cuối QUY_TAC_CODE_GIAO_DIEN.md — PR có giải thích 5 dòng + ảnh chụp + video điều hướng; nhóm trưởng kiểm tra đối chiếu Figma.
+
+## Chốt bổ sung ngày 27/11/2026 (nhóm trưởng)
+- **MH-15 Bạn bè**: Danh dựng giao diện ban đầu, nhưng phần chức năng T16 (Bạn bè) do **Thịnh** phụ trách — khi nối API và quay video bằng chứng, MH-15 do Thịnh giữ và được quyền sửa.
+- **MH-20 Tạo/Sửa chủ đề**: **Đỉnh** phụ trách giao diện + điều hướng; **Thịnh** phụ trách phần nối API của MH-20 (thuộc T17 Chủ đề) nên được quyền sửa file MH-20 ở phần logic/API. Hai người phối hợp khi cần đổi cả giao diện lẫn API.
