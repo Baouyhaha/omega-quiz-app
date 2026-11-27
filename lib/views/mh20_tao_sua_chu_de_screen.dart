@@ -1,53 +1,18 @@
-import 'package:dotted_border/dotted_border.dart';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
-import '../core/dinh_theme.dart';
-import '../widgets/limit_warning_banner_widget.dart';
-import '../widgets/topic_mode_option_widget.dart';
-import 'mh20_tao_sua_chu_de_mock.dart';
+import '../core/app_theme.dart';
+import '../models/topic.dart';
+import '../services/topic_service.dart';
+import 'mh03_ho_so_screen.dart';
 
-// ============================================================================
-// Mã MH: MH-20 — Tạo/Sửa chủ đề
-// Tên màn hình: Tạo/Sửa chủ đề (frame Figma: MH-20-tao-sua-chu-de,
-// node 83-1312, khung 412 x 917, trang "Mockup màu").
-// Thuộc luồng: L4 — Chủ sở hữu (Flow boards, flow-L4-chu-so-huu).
-// Vào màn hình này từ đâu:
-//   - Từ MH-02 Trang chủ, mục "Chủ đề của tôi", bấm "Tạo chủ đề".
-//   - Chế độ sửa dùng chung form này, các trường điền sẵn dữ liệu
-//     của chủ đề (Figma chỉ vẽ 1 frame, không có frame sửa riêng).
-// Từ màn hình này đi tiếp tới những màn hình nào:
-//   - Bấm "Lưu chủ đề" -> MH-22 Quản lý câu hỏi (Interaction trong
-//     Theo task: On click -> Navigate to MH-22-quan-ly-cau-hoi).
-//   - Nút quay lại "<" -> quay về màn hình trước (Chủ đề của tôi).
-//   - Bấm "Chọn ảnh bìa" -> mở trình chọn ảnh (không chuyển màn hình).
-//   - Radio Công khai / Riêng tư -> chỉ đổi lựa chọn, không chuyển màn.
-//   - Bottom nav (đích theo task):
-//     Trang chủ -> MH-02, Chủ đề -> MH-05, Thi đấu -> MH-17,
-//     Xếp hạng -> MH-14, Hồ sơ -> MH-03.
-// Dữ liệu giả đang dùng ở đâu:
-//   - File mh20_tao_sua_chu_de_mock.dart, biến mockTopic.
-//   - Khối dữ liệu đó có ghi chú // MOCK: ở dòng đầu.
-// Chức năng thật sẽ nối ở task nào:
-//   - Để giai đoạn chức năng: lưu chủ đề thật qua API, chọn ảnh bìa
-//     thật, kiểm tra hạn mức gói trước khi tạo (miễn phí tối đa
-//     1 chủ đề, 10 thành viên/khóa đề — ghi chú dưới bảng Flow L4).
-//
-// SỐ ĐO: theo task MH-20, xem bảng
-// đầy đủ trong mh20_figma_tokens.md. Font Nunito, nền #F6F4FF,
-// tím #6C4CF1, chữ #1D1B2E, hộp vàng #FFF3E0, ô nhập 372x52,
-// hộp ảnh bìa 372x96 nét đứt (dashes 6, 5), nút 372x52.
-// Dev Mode của Figma yêu cầu nâng cấp gói nên không lấy được mã CSS;
-// bo góc không hiển thị trong Properties nên đang dùng tạm 16px.
-// ============================================================================
-
-/// Màn hình MH-20: form tạo mới hoặc sửa một chủ đề.
-/// Cùng một form cho cả hai chế độ: [isEdit] = false thì tiêu đề là
-/// "Tạo chủ đề", = true thì tiêu đề là "Sửa chủ đề".
 class Mh20TaoSuaChuDeScreen extends StatefulWidget {
-  const Mh20TaoSuaChuDeScreen({super.key, this.isEdit = false});
+  final String token;
+  final Topic? topic;
 
-  /// true = đang sửa chủ đề có sẵn, false = đang tạo chủ đề mới.
-  final bool isEdit;
+  const Mh20TaoSuaChuDeScreen({super.key, required this.token, this.topic});
 
   @override
   State<Mh20TaoSuaChuDeScreen> createState() =>
@@ -55,302 +20,343 @@ class Mh20TaoSuaChuDeScreen extends StatefulWidget {
 }
 
 class _Mh20TaoSuaChuDeScreenState extends State<Mh20TaoSuaChuDeScreen> {
-  // Ô nhập tên và mô tả. Khởi tạo bằng dữ liệu giả theo dữ liệu
-  // của task ("Toán cao cấp" / "Ôn tập đạo hàm, tích phân") để
-  // ảnh chụp màn hình khớp thiết kế. Khi nối chức năng: chế độ tạo
-  // để trống, chế độ sửa điền dữ liệu thật của chủ đề.
+  late final TopicService _service;
   late final TextEditingController _nameController;
-  late final TextEditingController _descriptionController;
+  late final TextEditingController _descController;
+  late bool _isPublic;
+  bool _saving = false;
+  String? _error;
+  File? _coverImage;
 
-  // Chế độ đang chọn: 'public' = Công khai, 'private' = Riêng tư.
-  String _mode = mockTopic.mode;
-
-  // Tab đang chọn ở thanh điều hướng dưới. 1 = Chủ đề, vì màn này
-  // thuộc luồng chủ đề.
-  int _selectedIndex = 1;
+  bool get _isEdit => widget.topic != null;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: mockTopic.name);
-    _descriptionController =
-        TextEditingController(text: mockTopic.description);
+    _service = TopicService(widget.token);
+    _nameController = TextEditingController(text: widget.topic?.name ?? '');
+    _descController =
+        TextEditingController(text: widget.topic?.description ?? '');
+    _isPublic = widget.topic?.isPublic ?? true;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _descriptionController.dispose();
+    _descController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickCover() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    final path = result?.files.single.path;
+    if (path != null && mounted) {
+      setState(() => _coverImage = File(path));
+    }
+  }
+
+  Future<void> _save() async {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Nhập tên chủ đề');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      if (_isEdit) {
+        await _service.updateTopic(
+          id: widget.topic!.id,
+          name: name,
+          description: _descController.text,
+          isPublic: _isPublic,
+        );
+      } else {
+        await _service.createTopic(
+          name: name,
+          description: _descController.text,
+          isPublic: _isPublic,
+        );
+      }
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Widget _label(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 13, color: Color(0xFF6E6A8A)),
+      ),
+    );
+  }
+
+  InputDecoration _fieldDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(color: Color(0xFF9CA3AF)),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kBackground,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- Hàng tiêu đề: nút quay lại "‹" 34px + "Tạo chủ đề" 24px ---
-            // Theo task: nút Left 20px, tiêu đề Left 52px (cách nút 22px).
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                kSpacing20,
-                kSpacing12,
-                kSpacing20,
-                kSpacing12,
-              ),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    // Quay về màn hình trước đó.
-                    onTap: () => Navigator.pop(context),
-                    child: const Text('‹', style: kBackStyle),
-                  ),
-                  const SizedBox(width: 22),
-                  Text(
-                    widget.isEdit ? 'Sửa chủ đề' : 'Tạo chủ đề',
-                    style: kPageTitleStyle,
-                  ),
-                ],
-              ),
-            ),
-
-            // --- Form: cuộn được nếu màn hình nhỏ ---
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: kSpacing20,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Trường "Tên chủ đề". Nhãn 13px -> ô nhập 3px.
-                    const Text('Tên chủ đề', style: kLabelStyle),
-                    const SizedBox(height: kSpacing3),
-                    SizedBox(
-                      height: kFieldHeight,
-                      child: TextField(
-                        controller: _nameController,
-                        style: kFieldTextStyle,
-                        decoration: const InputDecoration(
-                          filled: true,
-                          fillColor: kSurface,
-                          border: kFieldBorder,
-                          enabledBorder: kFieldBorder,
-                          focusedBorder: kFieldFocusedBorder,
-                          contentPadding: kFieldPadding,
-                        ),
-                      ),
-                    ),
-                    // Ô nhập -> nhãn tiếp theo: 13px.
-                    const SizedBox(height: kSpacing13),
-
-                    // Trường "Mô tả".
-                    const Text('Mô tả', style: kLabelStyle),
-                    const SizedBox(height: kSpacing3),
-                    SizedBox(
-                      height: kFieldHeight,
-                      child: TextField(
-                        controller: _descriptionController,
-                        style: kFieldTextStyle,
-                        decoration: const InputDecoration(
-                          filled: true,
-                          fillColor: kSurface,
-                          border: kFieldBorder,
-                          enabledBorder: kFieldBorder,
-                          focusedBorder: kFieldFocusedBorder,
-                          contentPadding: kFieldPadding,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: kSpacing13),
-
-                    // Ô "Ảnh bìa": 372x96, viền nét đứt 1.5px #C9C4DE,
-                    // dashes 6, 5. Đang trống, bấm để chọn ảnh.
-                    const Text('Ảnh bìa', style: kLabelStyle),
-                    const SizedBox(height: kSpacing3),
-                    DottedBorder(
-                      // dotted_border 3.x doi API: khong truyen
-                      // dashPattern/color/... truc tiep nua, ma gom
-                      // vao RoundedRectDottedBorderOptions.
-                      options: const RoundedRectDottedBorderOptions(
-                        dashPattern: [6, 5],
-                        strokeWidth: 1.5,
-                        color: kRadioBorder,
-                        radius: Radius.circular(kRadiusItem),
-                      ),
-                      child: InkWell(
-                        // Mở trình chọn ảnh — để giai đoạn chức năng.
-                        onTap: () {},
-                        borderRadius: BorderRadius.circular(
-                          kRadiusItem,
-                        ),
-                        child: Container(
-                          width: double.infinity,
-                          height: kCoverHeight,
-                          color: kSurface,
-                          child: const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              // Dấu "+" 28px, #6E6A8A.
-                              Text(
-                                '+',
-                                style: TextStyle(
-                                  fontFamily: 'Nunito',
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w700,
-                                  color: kTextSecondary,
-                                  height: 1.0,
-                                ),
-                              ),
-                              // "Chọn ảnh bìa" 15px, #6E6A8A.
-                              Text(
-                                'Chọn ảnh bìa',
-                                style: TextStyle(
-                                  fontFamily: 'Nunito',
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w400,
-                                  color: kTextSecondary,
-                                  height: 1.0,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: kSpacing13),
-
-                    // Nhóm "Chế độ": tiêu đề 20px, radio 1 cách 12px,
-                    // radio 1 -> radio 2 cách 16px.
-                    const Text('Chế độ', style: kHeadingStyle),
-                    const SizedBox(height: 12),
-                    TopicModeOption(
-                      title: 'Công khai',
-                      description: 'ai cũng xem được',
-                      value: 'public',
-                      groupValue: _mode,
-                      onChanged: (value) {
-                        setState(() {
-                          _mode = value!;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TopicModeOption(
-                      title: 'Riêng tư',
-                      description: 'chỉ thành viên',
-                      value: 'private',
-                      groupValue: _mode,
-                      onChanged: (value) {
-                        setState(() {
-                          _mode = value!;
-                        });
-                      },
-                    ),
-                    // Radio 2 -> hộp cảnh báo: 23px.
-                    const SizedBox(height: 23),
-
-                    // Hộp cảnh báo hạn mức gói miễn phí, cao 52px.
-                    const LimitWarningBanner(
-                      text: 'Gói miễn phí: tối đa 1 chủ đề',
-                    ),
-                    const SizedBox(height: kSpacing20),
-                  ],
-                ),
-              ),
-            ),
-
-            // --- Nút chính "Lưu chủ đề", cao 52px ---
-            // Theo task: hộp cảnh báo -> nút cách 199px (khoảng trống lớn),
-            // nút đặt gần đáy, trên thanh điều hướng 20px.
-            Padding(
-              padding: const EdgeInsets.all(kSpacing20),
-              child: SizedBox(
-                width: double.infinity,
-                height: kButtonHeight,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Chỉ điều hướng ở giai đoạn giao diện, chưa lưu thật.
-                    // Theo task, sau khi lưu đi tới
-                    // MH-22 Quản lý câu hỏi.
-                    Navigator.pushNamed(context, '/mh22');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimary,
-                    foregroundColor: kOnPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        kRadiusButton,
-                      ),
-                    ),
-                  ),
-                  child: const Text(
-                    'Lưu chủ đề',
-                    style: kButtonTextStyle,
-                  ),
-                ),
-              ),
-            ),
-          ],
+      backgroundColor: const Color(0xFFF6F4FF),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF6F4FF),
+        elevation: 0,
+        leadingWidth: 40,
+        titleSpacing: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.chevron_left, size: 32),
+          color: const Color(0xFF1D1B2E),
+          onPressed: () => Navigator.maybePop(context),
+        ),
+        title: Text(
+          _isEdit ? 'Sửa chủ đề' : 'Tạo chủ đề',
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF1D1B2E),
+          ),
         ),
       ),
-      // --- Thanh điều hướng dưới: cao 76px, nền trắng,
-      // đường phân cách trên 1px #E9E6F7, nhãn 12px #9A94B8 ---
-      // Đích theo task: Trang chủ -> /mh02, Chủ đề -> /mh05,
-      // Thi đấu -> /mh17, Xếp hạng -> /mh14, Hồ sơ -> /mh03.
-      // Các màn đó chưa làm xong nên onTap hiện chỉ đổi tab đang chọn.
-      // Khi các màn đó xong, thay bằng Navigator.pushNamed tương ứng.
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: kSurface,
-          border: Border(
-            top: BorderSide(color: kInputBorder, width: 1),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              children: [
+                _label('Tên chủ đề'),
+                SizedBox(
+                  height: 48,
+                  child: TextField(
+                    controller: _nameController,
+                    decoration: _fieldDecoration('Nhập tên chủ đề'),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _label('Mô tả'),
+                TextField(
+                  controller: _descController,
+                  decoration: _fieldDecoration('Nhập mô tả'),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 14),
+                _label('Ảnh bìa'),
+                InkWell(
+                  onTap: _pickCover,
+                  child: _coverImage == null
+                      ? CustomPaint(
+                          painter: _DashedBorderPainter(
+                            color: const Color(0xFFD1D5DB),
+                            radius: 12,
+                          ),
+                          child: Container(
+                            height: 88,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add,
+                                  size: 24,
+                                  color: Color(0xFF6E6A8A),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Chọn ảnh bìa',
+                                  style: TextStyle(color: Color(0xFF6E6A8A)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.file(
+                            _coverImage!,
+                            height: 120,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Chế độ',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1D1B2E),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                RadioGroup<bool>(
+                  groupValue: _isPublic,
+                  onChanged: (v) => setState(() => _isPublic = v ?? true),
+                  child: Column(
+                    children: [
+                      RadioListTile<bool>(
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        title: const Text('Công khai — ai cũng xem được'),
+                        value: true,
+                        fillColor: WidgetStatePropertyAll(kPrimary),
+                      ),
+                      RadioListTile<bool>(
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        title: const Text('Riêng tư — chỉ thành viên'),
+                        value: false,
+                        fillColor: WidgetStatePropertyAll(kPrimary),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3C4),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.error, color: Color(0xFFF59E0B)),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Gói miễn phí: tối đa 1 chủ đề',
+                          style: TextStyle(color: Color(0xFF92400E)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(_error!, style: const TextStyle(color: kError)),
+                ],
+              ],
+            ),
           ),
-        ),
-        child: SizedBox(
-          height: 76,
-          child: BottomNavigationBar(
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: kSurface,
-            elevation: 0,
-            currentIndex: _selectedIndex,
-            selectedItemColor: kPrimary,
-            unselectedItemColor: kNavUnselected,
-            selectedLabelStyle: kNavLabelStyle,
-            unselectedLabelStyle: kNavLabelStyle,
-            onTap: (index) {
-              setState(() {
-                _selectedIndex = index;
-              });
-            },
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home_outlined),
-                label: 'Trang chủ',
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: SizedBox(
+              height: 52,
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kPrimary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: Text(
+                  _saving ? 'Đang lưu...' : 'Lưu chủ đề',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.layers_outlined),
-                label: 'Chủ đề',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.emoji_events_outlined),
-                label: 'Thi đấu',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.bar_chart_outlined),
-                label: 'Xếp hạng',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline),
-                label: 'Hồ sơ',
-              ),
-            ],
+            ),
           ),
-        ),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        selectedItemColor: kPrimary,
+        unselectedItemColor: const Color(0xFF6E6A8A),
+        selectedLabelStyle: const TextStyle(fontSize: 11),
+        unselectedLabelStyle: const TextStyle(fontSize: 11),
+        currentIndex: 1,
+        onTap: (i) {
+          if (i == 4) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const Mh03HoSoScreen(),
+              ),
+            );
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
+
+          BottomNavigationBarItem(icon: Icon(Icons.layers_outlined), label: 'Chủ đề'),
+          BottomNavigationBarItem(icon: Icon(Icons.emoji_events_outlined), label: 'Thi đấu'),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart_outlined), label: 'Xếp hạng'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Hồ sơ'),
+        ],
       ),
     );
   }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double radius;
+
+  _DashedBorderPainter({required this.color, required this.radius});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    const dash = 6.0;
+    const gap = 4.0;
+    final rect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(radius),
+    );
+    final path = Path()..addRRect(rect);
+    final metrics = path.computeMetrics().first;
+    var distance = 0.0;
+    while (distance < metrics.length) {
+      final segment = metrics.extractPath(
+        distance,
+        (distance + dash).clamp(0.0, metrics.length),
+      );
+      canvas.drawPath(segment, paint);
+      distance += dash + gap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import '../core/app_theme.dart';
 import '../models/topic.dart';
 import '../services/topic_service.dart';
+import 'mh03_ho_so_screen.dart';
+import 'mh05_chu_de_screen.dart';
 
 class Mh08ChiTietBoDeScreen extends StatefulWidget {
   final String token;
@@ -410,36 +412,45 @@ class _Mh08ChiTietBoDeScreenState extends State<Mh08ChiTietBoDeScreen> {
         backgroundColor: Colors.white,
         selectedItemColor: kPrimary,
         unselectedItemColor: const Color(0xFF6E6A8A),
-        selectedLabelStyle: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-        ),
+        selectedLabelStyle: const TextStyle(fontSize: 11),
         unselectedLabelStyle: const TextStyle(fontSize: 11),
         currentIndex: 1,
+        onTap: (i) {
+          if (i == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => Mh05ChuDeScreen(token: widget.token),
+              ),
+            );
+          } else if (i == 4) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const Mh03HoSoScreen(),
+              ),
+            );
+          }
+        },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            activeIcon: Icon(Icons.home),
+            icon: Icon(Icons.home_outlined),
             label: 'Trang chủ',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.layers),
-            activeIcon: Icon(Icons.layers),
+            icon: Icon(Icons.layers_outlined),
             label: 'Chủ đề',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.emoji_events),
-            activeIcon: Icon(Icons.emoji_events),
+            icon: Icon(Icons.emoji_events_outlined),
             label: 'Thi đấu',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart),
-            activeIcon: Icon(Icons.bar_chart),
+            icon: Icon(Icons.bar_chart_outlined),
             label: 'Xếp hạng',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            activeIcon: Icon(Icons.person),
+            icon: Icon(Icons.person_outline),
             label: 'Hồ sơ',
           ),
         ],

@@ -4,7 +4,9 @@ import '../core/app_theme.dart';
 import '../core/uy_theme.dart';
 import '../models/topic.dart';
 import '../services/topic_service.dart';
+import 'mh03_ho_so_screen.dart';
 import 'mh06_chi_tiet_chu_de_screen.dart';
+import 'mh20_tao_sua_chu_de_screen.dart';
 
 class Mh05ChuDeScreen extends StatefulWidget {
   final String token;
@@ -78,117 +80,26 @@ class _Mh05ChuDeScreenState extends State<Mh05ChuDeScreen> {
   }
 
   Future<void> _showForm({Topic? topic}) async {
-    final nameController = TextEditingController(text: topic?.name ?? '');
-    final descController =
-        TextEditingController(text: topic?.description ?? '');
-    bool isPublic = topic?.isPublic ?? true;
-    bool saving = false;
-    String? formError;
-    final isEdit = topic != null;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(isEdit ? 'Sửa chủ đề' : 'Tạo chủ đề'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  hintText: 'Tên chủ đề',
-                  labelText: 'Tên chủ đề',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descController,
-                decoration: const InputDecoration(
-                  hintText: 'Mô tả',
-                  labelText: 'Mô tả',
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 12),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Công khai'),
-                subtitle: const Text('Tắt là chủ đề riêng tư'),
-                value: isPublic,
-                onChanged: (v) => setDialogState(() => isPublic = v),
-              ),
-              if (formError != null) ...[
-                const SizedBox(height: 8),
-                Text(formError!, style: const TextStyle(color: kError)),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Hủy'),
-            ),
-            ElevatedButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      final name = nameController.text.trim();
-                      if (name.isEmpty) {
-                        setDialogState(
-                          () => formError = 'Nhập tên chủ đề',
-                        );
-                        return;
-                      }
-                      setDialogState(() {
-                        saving = true;
-                        formError = null;
-                      });
-                      try {
-                        if (isEdit) {
-                          await _service.updateTopic(
-                            id: topic.id,
-                            name: name,
-                            description: descController.text,
-                            isPublic: isPublic,
-                          );
-                        } else {
-                          await _service.createTopic(
-                            name: name,
-                            description: descController.text,
-                            isPublic: isPublic,
-                          );
-                        }
-                        if (!ctx.mounted) return;
-                        Navigator.pop(ctx, true);
-                      } catch (e) {
-                        setDialogState(() {
-                          saving = false;
-                          formError =
-                              e.toString().replaceFirst('Exception: ', '');
-                        });
-                      }
-                    },
-              child: Text(isEdit ? 'Lưu' : 'Tạo'),
-            ),
-          ],
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Mh20TaoSuaChuDeScreen(
+          token: widget.token,
+          topic: topic,
         ),
       ),
     );
-    Future.delayed(const Duration(milliseconds: 300), () {
-      nameController.dispose();
-      descController.dispose();
-    });
-    if (ok == true) {
+    if (changed == true) {
       await _load();
       if (!mounted) return;
-      _showSnack(isEdit ? 'Đã sửa chủ đề' : 'Đã tạo chủ đề');
+      _showSnack(topic != null ? 'Đã sửa chủ đề' : 'Đã tạo chủ đề');
     }
   }
 
   Widget _topicCard(Topic topic) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -226,10 +137,12 @@ class _Mh05ChuDeScreenState extends State<Mh05ChuDeScreen> {
               width: 96,
               height: 36,
               child: ElevatedButton(
-                onPressed: null,
+                onPressed: () =>
+                    _showSnack('Chưa có API tham gia, đang chờ Uy'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFEDE9FE),
                   disabledBackgroundColor: const Color(0xFFEDE9FE),
+                  foregroundColor: kPrimary,
                   disabledForegroundColor: kPrimary,
                   padding: EdgeInsets.zero,
                   shape: RoundedRectangleBorder(
@@ -287,18 +200,23 @@ class _Mh05ChuDeScreenState extends State<Mh05ChuDeScreen> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   children: [
-                    TextField(
+                    SizedBox(
+                      height: 48,
+                      child: TextField(
                       controller: _searchController,
+                      style: const TextStyle(fontSize: 14),
                       decoration: InputDecoration(
                         hintText: 'Tìm chủ đề công khai...',
                         hintStyle: const TextStyle(
+                          fontSize: 14,
                           color: Color(0xFF6E6A8A),
                         ),
+                        isDense: true,
                         filled: true,
                         fillColor: Colors.white,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
-                          vertical: 14,
+                          vertical: 12,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -314,6 +232,7 @@ class _Mh05ChuDeScreenState extends State<Mh05ChuDeScreen> {
                         ),
                       ),
                       onSubmitted: (_) => _load(),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     if (_topics.isEmpty)
@@ -357,38 +276,25 @@ class _Mh05ChuDeScreenState extends State<Mh05ChuDeScreen> {
         backgroundColor: Colors.white,
         selectedItemColor: kPrimary,
         unselectedItemColor: const Color(0xFF6E6A8A),
-        selectedLabelStyle: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-        ),
+        selectedLabelStyle: const TextStyle(fontSize: 11),
         unselectedLabelStyle: const TextStyle(fontSize: 11),
         currentIndex: 1,
+        onTap: (i) {
+          if (i == 4) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const Mh03HoSoScreen(),
+              ),
+            );
+          }
+        },
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            activeIcon: Icon(Icons.home),
-            label: 'Trang chủ',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.layers),
-            activeIcon: Icon(Icons.layers),
-            label: 'Chủ đề',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.emoji_events),
-            activeIcon: Icon(Icons.emoji_events),
-            label: 'Thi đấu',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart),
-            activeIcon: Icon(Icons.bar_chart),
-            label: 'Xếp hạng',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            activeIcon: Icon(Icons.person),
-            label: 'Hồ sơ',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
+          BottomNavigationBarItem(icon: Icon(Icons.layers_outlined), label: 'Chủ đề'),
+          BottomNavigationBarItem(icon: Icon(Icons.emoji_events_outlined), label: 'Thi đấu'),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart_outlined), label: 'Xếp hạng'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Hồ sơ'),
         ],
       ),
     );
