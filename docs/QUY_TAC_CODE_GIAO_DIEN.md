@@ -38,3 +38,9 @@ Giai đoạn này mỗi thành viên hiện thực phần giao diện được c
 - [ ] Chạy độc lập bằng dữ liệu giả, điều hướng tới/lui đúng luồng.
 - [ ] Màn hình giống Figma (tỷ lệ, thứ tự khối, trạng thái disabled nếu có).
 - [ ] PR có bản giải thích 5 dòng + ảnh chụp + video điều hướng.
+
+## 6. Chốt bổ sung ngày 27/11/2026 — quy tắc giai đoạn nối API và gộp code (nhóm trưởng)
+1. Phần code giao diện/chức năng **đã merge vào main thì giữ nguyên**, không ai phải viết lại cho khớp toàn bộ quy tắc ở mục 1–5 (các mục đó áp cho giai đoạn dựng giao diện).
+2. **File mới viết từ 27/11/2026** vẫn phải: có khối chú thích đầu file theo mẫu ở mục 1; màu/kích thước lấy từ `app_theme.dart`, không gõ thêm mã màu trực tiếp trong file.
+3. Khi gộp code vào app chính, **mọi màn hình phải đăng ký vào `lib/routes.dart` của main** và điều hướng qua route đã đăng ký; trong giai đoạn làm riêng trên nhánh cá nhân thì điều hướng trực tiếp tạm chấp nhận.
+4. ViewModel theo khung MVVM rút gọn của repo là khuyến khích cho màn hình mới; **không bắt buộc hồi tố** với code đã merge (model + service theo chức năng như hiện tại vẫn được chấp nhận).

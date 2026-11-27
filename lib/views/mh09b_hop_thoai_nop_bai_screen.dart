@@ -3,11 +3,17 @@
 /// Vào từ: MH-09 Làm bài (bấm Nộp bài).
 /// Đi tiếp tới: MH-10 Kết quả (bấm Nộp bài) / quay lại MH-09 (bấm Hủy).
 /// Không có thanh dưới (hộp thoại hiện trên MH-09, theo Figma).
-/// Dữ liệu giả: số câu chưa trả lời truyền từ MH-09 (mock: 3 câu).
-/// Chức năng thật: nối ở task T21 (để giai đoạn chức năng).
+/// Số câu chưa trả lời truyền từ MH-09 (số thật từ ViewModel, T23).
+/// Chức năng thật: T23 nối nút Nộp bài với API (submit rồi sang MH-10
+/// kèm kết quả); số câu chưa trả lời đã là số thật.
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../core/app_theme.dart';
+import '../services/api_client.dart';
+import '../viewmodels/exam_attempt_viewmodel.dart';
+import '../core/chuyen_canh.dart';
+import 'mh10_ket_qua_screen.dart';
 
 class Mh09bHopThoaiNopBai extends StatelessWidget {
   const Mh09bHopThoaiNopBai({super.key, required this.unanswered});
@@ -53,9 +59,38 @@ class Mh09bHopThoaiNopBai extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, '/mh10');
+                    // T23: gọi API nộp bài rồi mới sang MH-10, kèm kết
+                    // quả + examId (kết quả nộp không có examId, MH-10
+                    // cần để tải settings). Lỗi thì ở lại MH-09 + hiện
+                    // SnackBar, không sang MH-10 với kết quả rỗng.
+                    onPressed: () async {
+                      final vm = context.read<ExamAttemptViewModel>();
+                      try {
+                        final ketQua = await vm.submit();
+                        if (!context.mounted) return;
+                        Navigator.pop(context); // đóng dialog
+                        // T13: sang MH-10 bằng chuyển cảnh mờ dần 250ms.
+                        Navigator.push(
+                          context,
+                          routeChuyenCanh(
+                            const Mh10KetQuaScreen(),
+                            arguments: {
+                              ...ketQua,
+                              'examId': vm.examId,
+                            },
+                          ),
+                        );
+                      } on ApiException catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(e.message)));
+                      } catch (_) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text(
+                                    'Không nộp được bài. Kiểm tra API local đã chạy chưa.')));
+                      }
                     },
                     child: const Text('Nộp bài'),
                   ),

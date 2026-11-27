@@ -2,7 +2,7 @@
 const router = require('express').Router();
 const multer = require('multer');
 const XLSX = require('xlsx');
-const { db } = require('../store');
+const { repo } = require('../store');
 const { ok, ApiError, newId } = require('../util');
 const { authMiddleware, requireTopicOwner, assertTopicWritable, assertTopicAccess } = require('../auth');
 
@@ -21,9 +21,9 @@ function validateRow(r) {
   return errs;
 }
 
-function toQuestion(topicId, r) {
+async function toQuestion(topicId, r) {
   return {
-    id: r.id && db.questions.has(r.id) ? r.id : newId('q'),
+    id: r.id && (await repo.has('questions', r.id)) ? r.id : newId('q'),
     topicId,
     content: r.content,
     options: r.options,
@@ -39,12 +39,12 @@ function toQuestion(topicId, r) {
 
 router.use(authMiddleware);
 
-router.get('/topics/:id/questions', (req, res, next) => {
+router.get('/topics/:id/questions', async (req, res, next) => {
   try {
-    const topic = db.topics.get(req.params.id);
+    const topic = await repo.get('topics', req.params.id);
     if (!topic) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy chủ đề');
-    assertTopicAccess(req, topic);
-    let list = [...db.questions.values()].filter((q) => q.topicId === topic.id);
+    await assertTopicAccess(req, topic);
+    let list = (await repo.all('questions')).filter((q) => q.topicId === topic.id);
     if (req.query.difficulty) list = list.filter((q) => q.difficulty === req.query.difficulty);
     // Chu so huu thay ca dap an dung; nguoi khac chi thay cau hoi khong dap an
     const isOwner = topic.ownerId === req.user.uid;
@@ -52,9 +52,9 @@ router.get('/topics/:id/questions', (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/topics/:id/questions', (req, res, next) => {
+router.post('/topics/:id/questions', async (req, res, next) => {
   try {
-    assertTopicWritable(requireTopicOwner(req, req.params.id));
+    assertTopicWritable(await requireTopicOwner(req, req.params.id));
     const b = req.body || {};
     const row = {
       content: b.content, options: b.options, correctOption: b.correctOption,
@@ -63,36 +63,37 @@ router.post('/topics/:id/questions', (req, res, next) => {
     };
     const errs = validateRow(row);
     if (errs.length) throw new ApiError(400, 'VALIDATION_ERROR', errs.join('; '));
-    const q = toQuestion(req.params.id, row);
-    db.questions.set(q.id, q);
+    const q = await toQuestion(req.params.id, row);
+    await repo.put('questions', q.id, q);
     ok(res, q, 'Đã thêm câu hỏi', 201);
   } catch (e) { next(e); }
 });
 
-router.patch('/questions/:id', (req, res, next) => {
+router.patch('/questions/:id', async (req, res, next) => {
   try {
-    const q = db.questions.get(req.params.id);
+    const q = await repo.get('questions', req.params.id);
     if (!q) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy câu hỏi');
-    assertTopicWritable(requireTopicOwner(req, q.topicId));
+    assertTopicWritable(await requireTopicOwner(req, q.topicId));
     Object.assign(q, req.body || {});
+    await repo.put('questions', q.id, q);
     ok(res, q, 'Đã sửa câu hỏi');
   } catch (e) { next(e); }
 });
 
-router.delete('/questions/:id', (req, res, next) => {
+router.delete('/questions/:id', async (req, res, next) => {
   try {
-    const q = db.questions.get(req.params.id);
+    const q = await repo.get('questions', req.params.id);
     if (!q) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy câu hỏi');
-    assertTopicWritable(requireTopicOwner(req, q.topicId));
-    db.questions.delete(q.id);
+    assertTopicWritable(await requireTopicOwner(req, q.topicId));
+    await repo.del('questions', q.id);
     ok(res, null, 'Đã xóa câu hỏi');
   } catch (e) { next(e); }
 });
 
 // Import buoc 1: doc file, tra xem truoc + loi theo dong + previewToken
-router.post('/topics/:id/questions/import', upload.single('file'), (req, res, next) => {
+router.post('/topics/:id/questions/import', upload.single('file'), async (req, res, next) => {
   try {
-    assertTopicWritable(requireTopicOwner(req, req.params.id));
+    assertTopicWritable(await requireTopicOwner(req, req.params.id));
     if (!req.file) throw new ApiError(400, 'VALIDATION_ERROR', 'Thiếu file .xlsx');
     const wb = XLSX.read(req.file.buffer, { type: 'buffer' });
     const ws = wb.Sheets[wb.SheetNames[0]];
@@ -132,15 +133,15 @@ router.post('/topics/:id/questions/import', upload.single('file'), (req, res, ne
 });
 
 // Import buoc 2: xac nhan luu cac cau hop le
-router.post('/topics/:id/questions/import/confirm', (req, res, next) => {
+router.post('/topics/:id/questions/import/confirm', async (req, res, next) => {
   try {
-    assertTopicWritable(requireTopicOwner(req, req.params.id));
+    assertTopicWritable(await requireTopicOwner(req, req.params.id));
     const p = previews.get((req.body || {}).previewToken);
     if (!p || p.topicId !== req.params.id) throw new ApiError(404, 'NOT_FOUND', 'previewToken không hợp lệ hoặc đã hết hạn');
     let saved = 0;
     for (const r of p.rows) {
-      const q = toQuestion(req.params.id, r);
-      db.questions.set(q.id, q);
+      const q = await toQuestion(req.params.id, r);
+      await repo.put('questions', q.id, q);
       saved++;
     }
     previews.delete(req.body.previewToken);
@@ -148,10 +149,10 @@ router.post('/topics/:id/questions/import/confirm', (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.get('/topics/:id/questions/export', (req, res, next) => {
+router.get('/topics/:id/questions/export', async (req, res, next) => {
   try {
-    requireTopicOwner(req, req.params.id);
-    const rows = [...db.questions.values()]
+    await requireTopicOwner(req, req.params.id);
+    const rows = (await repo.all('questions'))
       .filter((q) => q.topicId === req.params.id)
       .map((q) => ({
         id: q.id, cau_hoi: q.content,

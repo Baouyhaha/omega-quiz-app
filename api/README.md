@@ -29,30 +29,38 @@ Các uid có sẵn trong dữ liệu mẫu: `dev:admin` (Admin nền tảng), `d
 `POST /api/auth/login` với token `dev:<uid mới>` kèm body `{name, email}`
 để tạo hồ sơ + kích hoạt dùng thử 7 ngày.
 
-Khi nối Firebase: cài `firebase-admin`, thay hàm `verifyToken()` trong
-`src/auth.js` bằng `verifyIdToken()` — các route không phải sửa.
+Khi server đã nối Firebase (có biến `FIREBASE_SERVICE_ACCOUNT`), API còn
+chấp nhận token Firebase Auth thật qua `verifyIdToken()` — song song với
+token dev. Xem `huong-dan-noi-firebase.md`.
 
 ## Dữ liệu
 
-Dữ liệu nằm trong bộ nhớ (`src/store.js`), mô phỏng 17 collection của
-Firestore theo ERD: users, plans, subscriptions, topics, topic_members,
-invitations, questions, exams, exam_questions, attempts, friendships,
-battle_rooms, contests, contest_entries, reviews, favorites, comments.
-Khởi động lại server là dữ liệu về trạng thái mẫu ban đầu; gọi
-`POST /api/dev/reset` để reset mà không cần khởi động lại (nút Reset dữ
-liệu kiểm thử trong app gọi endpoint này).
+Firestore là nơi lưu trữ chính. Lớp truy cập dữ liệu nằm ở `src/store.js`
+(hàm `repo`: get/has/all/entries/put/del/count — tất cả đều async), gồm
+17 collection theo ERD: users, plans, subscriptions, topics, topicMembers,
+invitations, questions, exams, examQuestions, attempts, friendships,
+battleRooms, contests, contestEntries, reviews, favorites, comments.
 
-Dữ liệu mẫu gồm: 2 chủ đề công khai (Toán cao cấp, Tiếng Anh — mỗi chủ đề
-12 câu), 1 bộ đề "Giữa kỳ — Đạo hàm" (10 câu), 5 gói thuê (giá theo
-mockup Figma MH-28: 49.000đ / 129.000đ / 449.000đ).
+- Có khóa dịch vụ (biến `FIREBASE_SERVICE_ACCOUNT`): mọi thao tác đọc/ghi
+  đi thẳng xuống Firestore. Lần chạy đầu, collection nào đang trống sẽ
+  được nạp dữ liệu mẫu.
+- Không có khóa: chạy bằng bộ nhớ + dữ liệu mẫu như bản dev (khởi động lại
+  là về trạng thái mẫu) — dùng để test ở máy chưa có khóa.
 
-Khi chuyển sang Firestore thật, chỉ thay `src/store.js` bằng lớp đọc/ghi
-Firestore giữ nguyên giao diện Map; các route giữ nguyên.
+Gọi `POST /api/dev/reset` để reset về dữ liệu mẫu mà không cần khởi động
+lại (nút Reset dữ liệu kiểm thử trong app gọi endpoint này); ở chế độ
+Firestore, reset xóa sạch 17 collection rồi nạp lại dữ liệu mẫu.
+
+Dữ liệu mẫu gồm: 2 chủ đề công khai (Toán cao cấp — 72 câu gồm 60 câu ngân
+hàng T32; Tiếng Anh — 12 câu), 1 bộ đề "Giữa kỳ — Đạo hàm" (10 câu),
+5 gói thuê (giá theo mockup Figma MH-28: 49.000đ / 129.000đ / 449.000đ).
+
+Cách nối Firebase, lấy khóa và kiểm chứng: xem `huong-dan-noi-firebase.md`.
 
 ## Cấu trúc
 
 - `src/server.js` — điểm vào, gắn router, xử lý lỗi tập trung đúng khuôn hợp đồng
-- `src/store.js` — kho dữ liệu trong bộ nhớ + dữ liệu mẫu + reset
+- `src/store.js` — lớp lưu trữ (Firestore thật / bộ nhớ) + dữ liệu mẫu + reset
 - `src/auth.js` — xác thực, kiểm tra hạn mức ở máy chủ, quyền chủ sở hữu
 - `src/util.js` — khuôn response, mã lỗi, Fisher–Yates, bảng hạng con vật
 - `src/routes/` — auth (UC01–03), topics (UC04–08), questions (UC09–10),
@@ -82,6 +90,6 @@ Firestore giữ nguyên giao diện Map; các route giữ nguyên.
   câu thì tính đúng công thức Đợt 2 theo từng câu (điểm câu × 0,5 × thời
   gian còn lại / thời gian quy định của câu); không gửi thì lui về tỷ lệ
   tổng thời gian. Hàm `grade()` trong `src/routes/attempts.js`.
-- Đối kháng 1-1: API lo tạo phòng/rút câu/chấm/tổng kết điểm rank; tiến
-  trình đối thủ thời gian thực app nghe qua Firestore `battle_rooms`
-  khi nối Firebase (hợp đồng mục 2.6).
+- Đối kháng 1-1: API lo tạo phòng/rút câu/chấm/tổng kết điểm rank; app
+  đọc trạng thái phòng và tiến trình đối thủ qua `GET /battles/{id}`
+  (hợp đồng mục 2.6) — app không đọc Firestore trực tiếp.

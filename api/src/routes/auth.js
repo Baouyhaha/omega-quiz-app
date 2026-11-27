@@ -1,12 +1,12 @@
 // UC01 dang nhap, UC03 ho so, UC02 goi thue
 const router = require('express').Router();
-const { db } = require('../store');
+const { repo } = require('../store');
 const { ok, ApiError, animalRank, nowISO } = require('../util');
 const { authMiddleware, activePlan, verifyToken, subscriptionState, WARNING_MS } = require('../auth');
 
-function profileOf(user) {
-  const { sub, plan } = activePlan(user.uid);
-  const myAttempts = [...db.attempts.values()].filter((a) => a.userId === user.uid && a.status !== 'IN_PROGRESS');
+async function profileOf(user) {
+  const { sub, plan } = await activePlan(user.uid);
+  const myAttempts = (await repo.all('attempts')).filter((a) => a.userId === user.uid && a.status !== 'IN_PROGRESS');
   const avg = myAttempts.length
     ? Math.round((myAttempts.reduce((s, a) => s + (a.percent || 0), 0) / myAttempts.length) * 10) / 10
     : null;
@@ -19,6 +19,11 @@ function profileOf(user) {
     rankScore: user.rankScore,
     animalRank: animalRank(user.rankScore),
     averagePercent: avg,
+    attemptCount: myAttempts.length,
+    friendCount: (await repo.all('friendships')).filter(
+      (f) => f.status === 'ACCEPTED' && (f.userA === user.uid || f.userB === user.uid)).length,
+    battleWins: (await repo.all('battleRooms')).filter(
+      (r) => r.results && r.results.winner === user.uid).length,
     subscription: sub
       ? { planId: sub.planId, planName: plan ? plan.name : sub.planId, expiresAt: sub.expiresAt, status: sub.status }
       : { planId: 'free', planName: 'Miễn phí', expiresAt: null, status: 'ACTIVE' },
@@ -32,68 +37,77 @@ router.post('/auth/login', async (req, res, next) => {
     const token = header.startsWith('Bearer ') ? header.slice(7) : null;
     const uid = token ? await verifyToken(token) : null;
     if (!uid) throw new ApiError(401, 'UNAUTHORIZED', 'Token không hợp lệ');
-    let user = db.users.get(uid);
+    let user = await repo.get('users', uid);
     if (!user) {
       const { name, email, photoUrl } = req.body || {};
       user = {
         uid, name: name || 'Người dùng', email: email || '', photoUrl: photoUrl || null,
         role: 'USER', rankScore: 1000, locked: false, createdAt: nowISO(),
       };
-      db.users.set(uid, user);
+      await repo.put('users', uid, user);
       const exp = new Date(Date.now() + 7 * 864e5).toISOString();
-      db.subscriptions.set(uid, { userId: uid, planId: 'trial', startedAt: nowISO(), expiresAt: exp, status: 'ACTIVE' });
+      await repo.put('subscriptions', uid, { userId: uid, planId: 'trial', startedAt: nowISO(), expiresAt: exp, status: 'ACTIVE' });
     }
     if (user.locked) throw new ApiError(403, 'ACCOUNT_LOCKED', 'Tài khoản đã bị khóa');
-    ok(res, profileOf(user), 'Đăng nhập thành công');
+    ok(res, await profileOf(user), 'Đăng nhập thành công');
   } catch (e) { next(e); }
 });
 
-router.get('/me', authMiddleware, (req, res) => ok(res, profileOf(req.user)));
-
-router.patch('/me', authMiddleware, (req, res) => {
-  const { name, photoUrl } = req.body || {};
-  if (name !== undefined) req.user.name = name;
-  if (photoUrl !== undefined) req.user.photoUrl = photoUrl;
-  ok(res, profileOf(req.user), 'Đã cập nhật hồ sơ');
+router.get('/me', authMiddleware, async (req, res, next) => {
+  try { ok(res, await profileOf(req.user)); } catch (e) { next(e); }
 });
 
-router.get('/plans', (req, res) => ok(res, [...db.plans.values()]));
-
-router.get('/me/subscription', authMiddleware, (req, res) => {
-  const { sub, plan } = activePlan(req.user.uid);
-  const { state } = subscriptionState(req.user.uid);
-  const daysLeft = sub && sub.expiresAt
-    ? Math.max(0, Math.ceil((new Date(sub.expiresAt) - new Date()) / 864e5))
-    : null;
-  // Trong giai doan WARNING: dem nguoc den ngay xoa du lieu (het han + 7 ngay)
-  const warningDaysLeft = state === 'WARNING' && sub && sub.expiresAt
-    ? Math.max(0, Math.ceil((new Date(sub.expiresAt).getTime() + WARNING_MS - Date.now()) / 864e5))
-    : (daysLeft !== null && daysLeft <= 7 ? daysLeft : null);
-  ok(res, {
-    planId: plan ? plan.id : 'free',
-    planName: plan ? plan.name : 'Miễn phí',
-    limits: plan ? plan.limits : null,
-    expiresAt: sub ? sub.expiresAt : null,
-    daysLeft,
-    lifecycleState: state,
-    warningDaysLeft,
-  });
+router.patch('/me', authMiddleware, async (req, res, next) => {
+  try {
+    const { name, photoUrl } = req.body || {};
+    if (name !== undefined) req.user.name = name;
+    if (photoUrl !== undefined) req.user.photoUrl = photoUrl;
+    await repo.put('users', req.user.uid, req.user);
+    ok(res, await profileOf(req.user), 'Đã cập nhật hồ sơ');
+  } catch (e) { next(e); }
 });
 
-router.post('/me/subscription/mock-pay', authMiddleware, (req, res, next) => {
+router.get('/plans', async (req, res, next) => {
+  try { ok(res, await repo.all('plans')); } catch (e) { next(e); }
+});
+
+router.get('/me/subscription', authMiddleware, async (req, res, next) => {
+  try {
+    const { sub, plan } = await activePlan(req.user.uid);
+    const { state } = await subscriptionState(req.user.uid);
+    const daysLeft = sub && sub.expiresAt
+      ? Math.max(0, Math.ceil((new Date(sub.expiresAt) - new Date()) / 864e5))
+      : null;
+    // Trong giai doan WARNING: dem nguoc den ngay xoa du lieu (het han + 7 ngay)
+    const warningDaysLeft = state === 'WARNING' && sub && sub.expiresAt
+      ? Math.max(0, Math.ceil((new Date(sub.expiresAt).getTime() + WARNING_MS - Date.now()) / 864e5))
+      : (daysLeft !== null && daysLeft <= 7 ? daysLeft : null);
+    ok(res, {
+      planId: plan ? plan.id : 'free',
+      planName: plan ? plan.name : 'Miễn phí',
+      limits: plan ? plan.limits : null,
+      expiresAt: sub ? sub.expiresAt : null,
+      daysLeft,
+      lifecycleState: state,
+      warningDaysLeft,
+    });
+  } catch (e) { next(e); }
+});
+
+router.post('/me/subscription/mock-pay', authMiddleware, async (req, res, next) => {
   try {
     const { planId } = req.body || {};
-    const plan = db.plans.get(planId);
+    const plan = await repo.get('plans', planId);
     if (!plan || planId === 'free') throw new ApiError(400, 'VALIDATION_ERROR', 'Gói không hợp lệ');
-    const cur = db.subscriptions.get(req.user.uid);
+    const cur = await repo.get('subscriptions', req.user.uid);
     const base = cur && cur.expiresAt && new Date(cur.expiresAt) > new Date() && cur.planId === planId
       ? new Date(cur.expiresAt)
       : new Date();
     const exp = plan.days ? new Date(base.getTime() + plan.days * 864e5).toISOString() : null;
-    db.subscriptions.set(req.user.uid, {
+    await repo.put('subscriptions', req.user.uid, {
       userId: req.user.uid, planId, startedAt: nowISO(), expiresAt: exp, status: 'ACTIVE',
     });
-    ok(res, profileOf(req.user).subscription, `Đã kích hoạt ${plan.name} (thanh toán mô phỏng)`);
+    ok(res, (await profileOf(req.user)).subscription, `Đã kích hoạt ${plan.name} (thanh toán mô phỏng)`);
   } catch (e) { next(e); }
 });
 
