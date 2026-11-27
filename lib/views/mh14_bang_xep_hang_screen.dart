@@ -7,6 +7,8 @@
 ///   vi Toàn hệ thống / Bạn bè, thẻ rank của tôi + thanh "còn X điểm lên
 ///   rank sau", dialog chúc mừng khi lên rank. Lọc tuần/tháng/chủ đề chờ
 ///   API (đã hỏi Uy), chưa vẽ chip giả cho phần đó.
+/// Avatar rank dùng icon con vật thống nhất của nhóm (assets/icons qua
+///   iconRank trong rank_helper) — thay avatar chữ cái cũ.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -123,12 +125,7 @@ class _Mh14NoiDungState extends State<_Mh14NoiDung> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircleAvatar(
-                radius: 36,
-                backgroundColor: animalColor(rankMoi),
-                child: Text(rankMoi[0],
-                    style: const TextStyle(color: Colors.white, fontSize: 32)),
-              ),
+              _AvatarRank(animal: rankMoi, radius: 36),
               const SizedBox(height: 16),
               const Text('Chúc mừng!',
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 20)),
@@ -310,11 +307,7 @@ class _TheRankCuaToi extends StatelessWidget {
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  backgroundColor: animalColor(rank),
-                  child: Text(rank[0],
-                      style: const TextStyle(color: Colors.white)),
-                ),
+                _AvatarRank(animal: rank),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text('Bạn đang là $rank · $diem điểm',
@@ -357,9 +350,8 @@ class _BucTop3 extends StatelessWidget {
     final name = entry['name'] as String;
     final animal = entry['animalRank'] as String;
     final isTop1 = rank == 1;
-    // Màu avatar theo con vật (T29); số hạng giữ màu Figma (hạng 1 vàng
+    // Avatar dùng icon con vật (T29); số hạng giữ màu Figma (hạng 1 vàng
     // cam, hạng 2–3 tím).
-    final avatarColor = animalColor(animal);
     final rankColor = isTop1 ? kWarning : kPrimary;
     final textTheme = Theme.of(context).textTheme;
     final column = Column(
@@ -373,12 +365,7 @@ class _BucTop3 extends StatelessWidget {
         Text('$rank',
             style: textTheme.titleLarge?.copyWith(color: rankColor)),
         const SizedBox(height: 4),
-        CircleAvatar(
-          radius: isTop1 ? 28 : 22,
-          backgroundColor: avatarColor,
-          child:
-              Text(name[0], style: const TextStyle(color: Colors.white)),
-        ),
+        _AvatarRank(animal: animal, radius: isTop1 ? 28 : 22),
         const SizedBox(height: 4),
         Text(name,
             style: textTheme.titleMedium?.copyWith(color: kTextPrimary)),
@@ -399,7 +386,7 @@ class _BucTop3 extends StatelessWidget {
   }
 }
 
-/// 1 hàng hạng 4 trở đi: số hạng, avatar chữ cái, tên + hạng thú, điểm.
+/// 1 hàng hạng 4 trở đi: số hạng, avatar icon con vật, tên + hạng thú, điểm.
 /// Dòng của mình có nền tím nhạt + nhãn "Bạn".
 class _HangBxh extends StatelessWidget {
   const _HangBxh({required this.entry, required this.isMe});
@@ -427,11 +414,7 @@ class _HangBxh extends StatelessWidget {
                 style:
                     textTheme.titleMedium?.copyWith(color: kTextPrimary)),
             const SizedBox(width: 8),
-            CircleAvatar(
-              backgroundColor: animalColor(animal),
-              child: Text(name[0],
-                  style: const TextStyle(color: Colors.white)),
-            ),
+            _AvatarRank(animal: animal),
           ],
         ),
         title: Row(
@@ -457,6 +440,28 @@ class _HangBxh extends StatelessWidget {
             style: const TextStyle(color: kTextSecondary)),
         trailing: Text('${entry['rankScore']} điểm',
             style: textTheme.titleMedium?.copyWith(color: kPrimary)),
+      ),
+    );
+  }
+}
+
+/// Avatar rank: icon con vật thống nhất của nhóm (assets/icons) trên nền
+/// tròn màu nhạt theo màu con vật (E2). Thay avatar chữ cái cũ.
+class _AvatarRank extends StatelessWidget {
+  const _AvatarRank({required this.animal, this.radius = 20});
+
+  final String animal;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: animalColor(animal).withValues(alpha: 0.18),
+      child: Image.asset(
+        iconRank(animal),
+        width: radius * 1.5,
+        height: radius * 1.5,
       ),
     );
   }
