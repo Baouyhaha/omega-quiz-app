@@ -1,11 +1,12 @@
 // ApiClient — lớp gọi Web API dùng chung cho mọi task (tạo ở T40).
-// Mọi request gửi kèm token dev tạm thời; khi task đăng nhập T14 xong
-// sẽ đổi sang Firebase ID token (xem TODO ở [_headers]).
+// Token gửi kèm: token truyền riêng (nếu có) -> token phiên đăng nhập
+// thật trong Session (T14) -> token dev tạm khi chưa đăng nhập.
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
 import '../core/constants.dart';
+import 'session.dart';
 
 /// Lỗi trả về từ API: có message để hiện cho người dùng,
 /// errorCode để code xử lý riêng (ví dụ LIMIT_EXCEEDED, PIN_INVALID...).
