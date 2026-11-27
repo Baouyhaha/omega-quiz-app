@@ -368,6 +368,137 @@ class ApiAdminStats {
   final int totalContests;
 }
 
+/// Mot dong thong ke theo bo de (GET /admin/stats/exams, T39 buoc 2):
+/// examId, title, topicId, topicName, attempts, averagePercent,
+/// highestPercent, lowestPercent (diem % 0-100, null khi bo de
+/// chua co luot lam nao da nop).
+class ApiExamStats {
+  const ApiExamStats({
+    required this.examId,
+    required this.title,
+    required this.topicId,
+    this.topicName,
+    required this.attempts,
+    this.averagePercent,
+    this.highestPercent,
+    this.lowestPercent,
+  });
+
+  factory ApiExamStats.fromJson(Map<String, dynamic> json) {
+    return ApiExamStats(
+      examId: json['examId'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      topicId: json['topicId'] as String? ?? '',
+      topicName: json['topicName'] as String?,
+      attempts: json['attempts'] as int? ?? 0,
+      averagePercent: (json['averagePercent'] as num?)?.toDouble(),
+      highestPercent: (json['highestPercent'] as num?)?.toDouble(),
+      lowestPercent: (json['lowestPercent'] as num?)?.toDouble(),
+    );
+  }
+
+  final String examId;
+  final String title;
+  final String topicId;
+  final String? topicName;
+  final int attempts;
+  final double? averagePercent;
+  final double? highestPercent;
+  final double? lowestPercent;
+}
+
+/// Mot dong thong ke theo chu de (GET /admin/stats/topics, T39
+/// buoc 3): topicId, name, attempts, averagePercent (diem % TB,
+/// null khi chua co luot lam), correctRatio (ti le cau dung 0-1,
+/// null khi chua co cau hoi nao trong cac luot lam).
+class ApiTopicStats {
+  const ApiTopicStats({
+    required this.topicId,
+    required this.name,
+    required this.attempts,
+    this.averagePercent,
+    this.correctRatio,
+  });
+
+  factory ApiTopicStats.fromJson(Map<String, dynamic> json) {
+    return ApiTopicStats(
+      topicId: json['topicId'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      attempts: json['attempts'] as int? ?? 0,
+      averagePercent: (json['averagePercent'] as num?)?.toDouble(),
+      correctRatio: (json['correctRatio'] as num?)?.toDouble(),
+    );
+  }
+
+  final String topicId;
+  final String name;
+  final int attempts;
+  final double? averagePercent;
+  final double? correctRatio;
+}
+
+/// Mot luot lam co vi pham (nam trong GET /admin/stats/violations):
+/// attemptId, examId, topicId, violations, status.
+class ApiViolationAttempt {
+  const ApiViolationAttempt({
+    required this.attemptId,
+    this.examId,
+    this.topicId,
+    required this.violations,
+    required this.status,
+  });
+
+  factory ApiViolationAttempt.fromJson(Map<String, dynamic> json) {
+    return ApiViolationAttempt(
+      attemptId: json['attemptId'] as String? ?? '',
+      examId: json['examId'] as String?,
+      topicId: json['topicId'] as String?,
+      violations: json['violations'] as int? ?? 0,
+      status: json['status'] as String? ?? '',
+    );
+  }
+
+  final String attemptId;
+  final String? examId;
+  final String? topicId;
+  final int violations;
+  final String status;
+}
+
+/// Mot tai khoan co vi pham gian lan (GET /admin/stats/violations):
+/// uid, name, email, totalViolations, forceSubmittedCount (so luot
+/// bi tu nop khi du 5 lan vi pham), attempts (chi tiet tung luot).
+class ApiViolationUser {
+  const ApiViolationUser({
+    required this.uid,
+    required this.name,
+    this.email,
+    required this.totalViolations,
+    required this.forceSubmittedCount,
+    required this.attempts,
+  });
+
+  factory ApiViolationUser.fromJson(Map<String, dynamic> json) {
+    return ApiViolationUser(
+      uid: json['uid'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      email: json['email'] as String?,
+      totalViolations: json['totalViolations'] as int? ?? 0,
+      forceSubmittedCount: json['forceSubmittedCount'] as int? ?? 0,
+      attempts: (json['attempts'] as List<dynamic>? ?? [])
+          .map((e) => ApiViolationAttempt.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  final String uid;
+  final String name;
+  final String? email;
+  final int totalViolations;
+  final int forceSubmittedCount;
+  final List<ApiViolationAttempt> attempts;
+}
+
 /// Goi dang dung cua mot tai khoan (nam trong chi tiet):
 /// userId, planId, startedAt, expiresAt (ISO, co the null), status.
 class ApiAdminSubscription {
@@ -665,6 +796,45 @@ class DinhApi {
     return ApiAdminStats.fromJson(
       _decode(res) as Map<String, dynamic>,
     );
+  }
+
+  /// GET /admin/stats/exams — thong ke theo bo de: so luot lam,
+  /// diem % TB / cao nhat / thap nhat (T39 buoc 2, MH-33).
+  static Future<List<ApiExamStats>> fetchExamStats() async {
+    final res = await http.get(
+      Uri.parse('${kDinhApiBaseUrl}admin/stats/exams'),
+      headers: _adminHeaders,
+    );
+    final data = _decode(res) as List<dynamic>;
+    return data
+        .map((e) => ApiExamStats.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// GET /admin/stats/topics — thong ke theo chu de: so luot lam,
+  /// diem % TB, ti le cau dung (T39 buoc 3, MH-33).
+  static Future<List<ApiTopicStats>> fetchTopicStats() async {
+    final res = await http.get(
+      Uri.parse('${kDinhApiBaseUrl}admin/stats/topics'),
+      headers: _adminHeaders,
+    );
+    final data = _decode(res) as List<dynamic>;
+    return data
+        .map((e) => ApiTopicStats.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// GET /admin/stats/violations — tai khoan gian lan: tong vi pham,
+  /// so luot bi tu nop, chi tiet tung luot (T39 buoc 3, MH-33).
+  static Future<List<ApiViolationUser>> fetchViolationStats() async {
+    final res = await http.get(
+      Uri.parse('${kDinhApiBaseUrl}admin/stats/violations'),
+      headers: _adminHeaders,
+    );
+    final data = _decode(res) as List<dynamic>;
+    return data
+        .map((e) => ApiViolationUser.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// PUT /admin/plans/:id — cap nhat goi (UC26, MH-32).
