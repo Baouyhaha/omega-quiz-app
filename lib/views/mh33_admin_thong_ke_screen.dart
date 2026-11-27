@@ -21,25 +21,29 @@ import 'mh33_admin_thong_ke_mock.dart';
 //     dung trượt ngang.
 //   - Nút quay lại "‹" ở header: về Hồ sơ (MH-03) — màn vào Admin.
 //     Nút này không có trong thiết kế Figma, thêm theo luồng đã chốt.
-//   - Nút "Xem" ở hàng tài khoản gian lận chưa có logic thật
-//     ở giai đoạn giao diện.
 // Dữ liệu thật đang dùng (nối API 25/11, UC28):
 //   - 3 thẻ thống kê tổng: GET /admin/stats (token dev:admin) —
 //     Tổng tài khoản = totalUsers, Tổng chủ đề = totalTopics,
 //     Tổng lượt làm = totalAttempts. Dữ liệu là seed trong bộ nhớ
-//     của API (5 tài khoản, 2 chủ đề, 0 lượt làm), restart server
-//     là reset — không phải 128 / 45 / 1.240 như mock cũ.
-//   - Biểu đồ lượt làm theo ngày và thẻ tài khoản gian lận VẪN
-//     LÀ MOCK (mockChartBars, mockCheatAccount trong file mock):
-//     API chưa có endpoint trả lượt làm theo ngày hay danh sách
-//     tài khoản gian lận, nên không bịa số thật cho 2 chỗ này.
-//     Khi quay video bằng chứng T39 thì giải thích 2 chỗ đó.
-//   - Bảng thống kê theo bộ đề và theo chủ đề mà T39 yêu cầu
-//     cũng chưa có endpoint — màn này hiện chưa có 2 bảng đó
-//     (đúng như bản Figma gốc, cũng không có).
+//     của API (5 tài khoản, 2 chủ đề, 0 lượt làm khi chưa tạo
+//     lượt làm mẫu), restart server là reset — không phải 128 /
+//     45 / 1.240 như mock cũ.
+//   - Bảng theo bộ đề: GET /admin/stats/exams — số lượt làm,
+//     điểm % TB / cao nhất / thấp nhất (T39 bước 2). Lượt bị tự
+//     nộp (FORCE_SUBMITTED, chưa nộp bài) được API tính là 0%.
+//   - Bảng theo chủ đề: GET /admin/stats/topics — số lượt làm,
+//     điểm % TB, tỉ lệ câu đúng (T39 bước 3).
+//   - Tài khoản gian lận: GET /admin/stats/violations — tổng vi
+//     phạm, số lượt bị tự nộp, chi tiết từng lượt (T39 bước 3).
+//     Nút "Xem" mở hộp thoại chi tiết từng lượt làm.
+//   - Biểu đồ lượt làm theo ngày VẪN LÀ MOCK (mockChartBars
+//     trong file mock): API chưa có endpoint trả lượt làm theo
+//     ngày, nên không bịa số thật cho chỗ này. Khi quay video
+//     bằng chứng T39 thì giải thích chỗ đó.
 // Chức năng thật sẽ nối ở task nào:
-//   - T39 bước 3 (thống kê theo API): đã nối phần số tổng, xem
-//     hàm _loadStats. Kiến trúc: app gọi API, API mới qua Firebase.
+//   - T39 (thống kê theo API): đã nối đủ 3 thẻ tổng + 2 bảng +
+//     danh sách gian lận, xem hàm _loadStats. Kiến trúc: app gọi
+//     API, API mới qua Firebase.
 //
 // SỐ ĐO: theo task MH-33, xem bảng đầy đủ trong mh33_figma_tokens.md.
 // Font Nunito, nền #F6F4FF, header tím đậm #4A32B8 cao 104px,
@@ -50,9 +54,10 @@ import 'mh33_admin_thong_ke_mock.dart';
 // ============================================================================
 
 /// Màn hình MH-33: thống kê hệ thống cho admin — 3 thẻ tổng,
-/// biểu đồ cột lượt làm theo ngày, danh sách tài khoản gian lận.
-/// 3 thẻ tổng tải từ API admin; biểu đồ và thẻ gian lận vẫn là
-/// mock vì API chưa có endpoint cho 2 chỗ đó.
+/// biểu đồ cột lượt làm theo ngày, bảng theo bộ đề, bảng theo
+/// chủ đề, danh sách tài khoản gian lận. Tất cả trừ biểu đồ đều
+/// tải từ API admin; biểu đồ vẫn là mock vì API chưa có
+/// endpoint cho lượt làm theo ngày.
 class Mh33AdminThongKeScreen extends StatefulWidget {
   const Mh33AdminThongKeScreen({super.key});
 
@@ -64,6 +69,9 @@ class Mh33AdminThongKeScreen extends StatefulWidget {
 class _Mh33AdminThongKeScreenState
     extends State<Mh33AdminThongKeScreen> {
   ApiAdminStats? _stats;
+  List<ApiExamStats> _examStats = [];
+  List<ApiTopicStats> _topicStats = [];
+  List<ApiViolationUser> _violationUsers = [];
 
   bool _loading = true;
   String? _error;
@@ -74,7 +82,9 @@ class _Mh33AdminThongKeScreenState
     _loadStats();
   }
 
-  /// Tai so tong tu GET /admin/stats.
+  /// Tai so tong tu GET /admin/stats, roi tai song song 3 bang phu
+  /// (theo bo de / theo chu de / gian lan). Bang phu nao loi thi
+  /// de trong thay vi hong ca man hinh.
   Future<void> _loadStats() async {
     if (_stats == null) {
       setState(() {
@@ -90,6 +100,17 @@ class _Mh33AdminThongKeScreenState
         _loading = false;
         _error = null;
       });
+      final lists = await Future.wait<dynamic>([
+        _safeList(DinhApi.fetchExamStats),
+        _safeList(DinhApi.fetchTopicStats),
+        _safeList(DinhApi.fetchViolationStats),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _examStats = lists[0] as List<ApiExamStats>;
+        _topicStats = lists[1] as List<ApiTopicStats>;
+        _violationUsers = lists[2] as List<ApiViolationUser>;
+      });
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -100,6 +121,63 @@ class _Mh33AdminThongKeScreenState
           SnackBar(content: Text(e.message)),
         );
       }
+    }
+  }
+
+  /// Hop thoai chi tiet cac luot lam vi pham cua 1 tai khoan
+  /// (nut "Xem" o the gian lan).
+  Future<void> _showViolationDetail(ApiViolationUser user) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(user.name),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Tổng ${user.totalViolations} lần vi phạm · '
+                '${user.forceSubmittedCount} lượt bị tự nộp'),
+            const SizedBox(height: 12),
+            for (final a in user.attempts) ...[
+              Text(
+                '${_examTitle(a.examId)}: ${a.violations} lần vi phạm '
+                '(${_statusText(a.status)})',
+              ),
+              const SizedBox(height: 6),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Ten bo de theo ma (de hien trong hop thoai vi pham);
+  /// khong tim thay thi tra lai ma.
+  String _examTitle(String? examId) {
+    if (examId == null) return '—';
+    for (final e in _examStats) {
+      if (e.examId == examId) return e.title;
+    }
+    return examId;
+  }
+
+  /// Trang thai luot lam -> tieng Viet.
+  String _statusText(String status) {
+    switch (status) {
+      case 'FORCE_SUBMITTED':
+        return 'Bị tự nộp';
+      case 'SUBMITTED':
+        return 'Đã nộp';
+      case 'IN_PROGRESS':
+        return 'Đang làm';
+      default:
+        return status;
     }
   }
 
@@ -245,18 +323,52 @@ class _Mh33AdminThongKeScreenState
                               ),
                               const SizedBox(height: 5),
                               const _ChartCard(),
-                              // Thẻ biểu đồ -> tiêu đề gian lận: 16px theo task.
+                              // Thẻ biểu đồ -> tiêu đề bảng bộ đề: 16px.
                               const SizedBox(height: 16),
 
-                              // --- Tài khoản gian lận ---
-                              // VAN LA MOCK: API chua co endpoint tra
-                              // danh sach tai khoan gian lan.
+                              // --- Bảng thống kê theo bộ đề (T39 bước 2) ---
+                              const Text(
+                                'Thống kê theo bộ đề',
+                                style: kHeadingStyle,
+                              ),
+                              const SizedBox(height: 5),
+                              _ExamStatsTable(rows: _examStats),
+                              // Bảng bộ đề -> tiêu đề bảng chủ đề: 16px.
+                              const SizedBox(height: 16),
+
+                              // --- Bảng thống kê theo chủ đề (T39 bước 3) ---
+                              const Text(
+                                'Thống kê theo chủ đề',
+                                style: kHeadingStyle,
+                              ),
+                              const SizedBox(height: 5),
+                              _TopicStatsTable(rows: _topicStats),
+                              // Bảng chủ đề -> tiêu đề gian lận: 16px.
+                              const SizedBox(height: 16),
+
+                              // --- Tài khoản gian lận (dữ liệu thật) ---
                               const Text(
                                 'Tài khoản gian lận',
                                 style: kHeadingStyle,
                               ),
                               const SizedBox(height: 5),
-                              const _CheatAccountCard(),
+                              if (_violationUsers.isEmpty)
+                                const _EmptyCard(
+                                  text: 'Không có tài khoản gian lận',
+                                )
+                              else
+                                ..._violationUsers.map(
+                                  (u) => Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: 8,
+                                    ),
+                                    child: _ViolationUserCard(
+                                      user: u,
+                                      onView: () =>
+                                          _showViolationDetail(u),
+                                    ),
+                                  ),
+                                ),
                               const SizedBox(height: 20),
                             ],
                           ),
@@ -401,14 +513,207 @@ class _ChartCard extends StatelessWidget {
   }
 }
 
-/// Thẻ tài khoản gian lận theo task: 372x76, nền trắng,
-/// viền 1px #E9E6F7. Avatar tròn 44px #FF5A5F chữ "A",
-/// tên 17px 700, "12 lần vi phạm" 13px 700 #FF5A5F,
-/// nút "Xem" 60x36 viền tím ở phải.
-/// VẪN LÀ MOCK — API chưa có endpoint tài khoản gian lận.
-/// Chỉ dùng ở MH-33 nên để trong file màn hình này.
-class _CheatAccountCard extends StatelessWidget {
-  const _CheatAccountCard();
+/// Diem % (0-100) -> '75%' neu chan, '75.5%' neu le; null -> '—'.
+String _formatPercent(double? v) {
+  if (v == null) return '—';
+  if (v == v.truncateToDouble()) return '${v.toInt()}%';
+  return '${v.toStringAsFixed(1)}%';
+}
+
+/// Ti le 0-1 -> '50.0%'; null -> '—'.
+String _formatRatio(double? r) {
+  if (r == null) return '—';
+  return '${(r * 100).toStringAsFixed(1)}%';
+}
+
+/// Tai 1 danh sach phu: loi thi tra ve danh sach trong thay vi
+/// hong ca man hinh (cac bang phu khong chan 3 the tong).
+Future<List<T>> _safeList<T>(Future<List<T>> Function() load) async {
+  try {
+    return await load();
+  } catch (_) {
+    return [];
+  }
+}
+
+/// Mot hang trong bang thong ke: ten o trai (co dinh 3 phan),
+/// cac so can phai (moi so 1 phan).
+class _StatsRow extends StatelessWidget {
+  const _StatsRow({
+    required this.title,
+    required this.values,
+    this.isHeader = false,
+  });
+
+  final String title;
+  final List<String> values;
+  final bool isHeader;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = isHeader
+        ? kQuestionPreviewStyle.copyWith(fontWeight: FontWeight.w700)
+        : kQuestionPreviewStyle;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Text(
+              title,
+              style: style,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ),
+          for (final v in values)
+            Expanded(
+              child: Text(
+                v,
+                style: style,
+                textAlign: TextAlign.right,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bang thong ke theo bo de (GET /admin/stats/exams): cot
+/// Bo de | Luot | TB | Cao | Thap.
+class _ExamStatsTable extends StatelessWidget {
+  const _ExamStatsTable({required this.rows});
+
+  final List<ApiExamStats> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: kSurface,
+        border: Border.all(color: kInputBorder, width: 1),
+        borderRadius: BorderRadius.circular(kRadiusItem),
+      ),
+      child: Column(
+        children: [
+          const _StatsRow(
+            title: 'Bộ đề',
+            values: ['Lượt', 'TB', 'Cao', 'Thấp'],
+            isHeader: true,
+          ),
+          for (final r in rows) ...[
+            const Divider(height: 1, color: kInputBorder),
+            _StatsRow(
+              title: r.title,
+              values: [
+                '${r.attempts}',
+                _formatPercent(r.averagePercent),
+                _formatPercent(r.highestPercent),
+                _formatPercent(r.lowestPercent),
+              ],
+            ),
+          ],
+          if (rows.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'Chưa có bộ đề nào',
+                style: kQuestionPreviewStyle,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bang thong ke theo chu de (GET /admin/stats/topics): cot
+/// Chu de | Luot | TB | Dung (ti le cau dung).
+class _TopicStatsTable extends StatelessWidget {
+  const _TopicStatsTable({required this.rows});
+
+  final List<ApiTopicStats> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: kSurface,
+        border: Border.all(color: kInputBorder, width: 1),
+        borderRadius: BorderRadius.circular(kRadiusItem),
+      ),
+      child: Column(
+        children: [
+          const _StatsRow(
+            title: 'Chủ đề',
+            values: ['Lượt', 'TB', 'Đúng'],
+            isHeader: true,
+          ),
+          for (final r in rows) ...[
+            const Divider(height: 1, color: kInputBorder),
+            _StatsRow(
+              title: r.name,
+              values: [
+                '${r.attempts}',
+                _formatPercent(r.averagePercent),
+                _formatRatio(r.correctRatio),
+              ],
+            ),
+          ],
+          if (rows.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'Chưa có chủ đề nào',
+                style: kQuestionPreviewStyle,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The trang thai trong: nen trang, vien nhu the, chu o giua.
+class _EmptyCard extends StatelessWidget {
+  const _EmptyCard({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: kSurface,
+        border: Border.all(color: kInputBorder, width: 1),
+        borderRadius: BorderRadius.circular(kRadiusItem),
+      ),
+      child: Text(
+        text,
+        style: kQuestionPreviewStyle,
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+}
+
+/// The 1 tai khoan gian lan (du lieu that tu GET
+/// /admin/stats/violations): avatar chu cai dau, ten, tong vi
+/// pham + so luot bi tu nop, nut "Xem" mo hop thoai chi tiet.
+class _ViolationUserCard extends StatelessWidget {
+  const _ViolationUserCard({
+    required this.user,
+    required this.onView,
+  });
+
+  final ApiViolationUser user;
+  final VoidCallback onView;
 
   @override
   Widget build(BuildContext context) {
@@ -424,17 +729,17 @@ class _CheatAccountCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Avatar tròn 44px.
+          // Avatar tròn 44px, màu đỏ như thẻ Figma gốc.
           Container(
             width: 44,
             height: 44,
             alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: mockCheatAccount.avatarColor,
+            decoration: const BoxDecoration(
+              color: kHard,
               shape: BoxShape.circle,
             ),
             child: Text(
-              mockCheatAccount.avatarLetter,
+              user.name.isNotEmpty ? user.name[0] : '?',
               style: kAccountAvatarLetterStyle,
             ),
           ),
@@ -448,26 +753,26 @@ class _CheatAccountCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
                 Text(
-                  mockCheatAccount.name,
+                  user.name,
                   style: kAccountNameStyle,
                 ),
                 // Tên -> dòng vi phạm: 9px theo số đo hộp
                 // chữ trong Figma (bài học MH-30).
                 const SizedBox(height: 9),
                 Text(
-                  mockCheatAccount.violationText,
+                  '${user.totalViolations} lần vi phạm · '
+                  '${user.forceSubmittedCount} lượt bị tự nộp',
                   style: kCheatViolationStyle,
                 ),
               ],
             ),
           ),
-          // Nút "Xem" 60x36.
+          // Nút "Xem" 60x36: mở hộp thoại chi tiết từng lượt.
           SizedBox(
             width: 60,
             height: 36,
             child: OutlinedButton(
-              // Chưa có logic thật ở giai đoạn giao diện.
-              onPressed: () {},
+              onPressed: onView,
               style: OutlinedButton.styleFrom(
                 backgroundColor: kSurface,
                 side: const BorderSide(

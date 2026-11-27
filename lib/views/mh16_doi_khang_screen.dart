@@ -156,12 +156,19 @@ class Mh16DoiKhangScreen extends StatelessWidget {
                         child: Text('U', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Uy', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                            Text('Ngựa · 1240 điểm', style: TextStyle(color: kTextSub)),
+                            const Text('Uy', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                            Row(
+                              children: [
+                                // Icon rank theo bộ icon T12 (assets/icons/rank/)
+                                Image.asset('assets/icons/rank/rank_ngua.png', width: 20, height: 20),
+                                const SizedBox(width: 6),
+                                const Text('1240 điểm', style: TextStyle(color: kTextSub)),
+                              ],
+                            ),
                           ],
                         ),
                       ),

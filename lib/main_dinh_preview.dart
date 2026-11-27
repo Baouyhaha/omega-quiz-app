@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'core/dinh_theme.dart';
+import 'models/topic.dart';
 import 'views/mh20_tao_sua_chu_de_screen.dart';
 import 'views/mh22_quan_ly_cau_hoi_screen.dart';
 import 'views/mh23_soan_sua_cau_hoi_screen.dart';
@@ -38,10 +39,24 @@ class DinhPreviewApp extends StatelessWidget {
       // AdminHostScreen() (thanh tab dung yen, chi noi dung truot).
       home: AdminHostScreen(),
       routes: {
-        '/mh20': (context) => const Mh20TaoSuaChuDeScreen(),
-        // Che do sua, dung chung form MH-20.
-        '/mh20-edit': (context) =>
-            const Mh20TaoSuaChuDeScreen(isEdit: true),
+        // MH-20 ban noi API that (Thinh): can token; che do sua truyen
+        // them topic mau de xem form.
+        '/mh20': (context) =>
+            const Mh20TaoSuaChuDeScreen(token: 'dev:dinh'),
+        '/mh20-edit': (context) => const Mh20TaoSuaChuDeScreen(
+              token: 'dev:dinh',
+              topic: Topic(
+                id: 'topic_toan',
+                ownerId: 'dinh',
+                name: 'Toán cao cấp',
+                description: '',
+                visibility: 'PUBLIC',
+                createdAt: '',
+                memberCount: 0,
+                examCount: 0,
+                questionCount: 0,
+              ),
+            ),
         '/mh22': (context) => Mh22QuanLyCauHoiScreen(),
         '/mh23': (context) => Mh23SoanSuaCauHoiScreen(),
         // Che do sua, dung chung form MH-23.

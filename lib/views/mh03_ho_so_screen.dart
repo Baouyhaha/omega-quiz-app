@@ -22,9 +22,9 @@ const _mockHoSo = {
   'email': '0306241504@caothang.edu.vn',
   'hangConVat': 'Ngựa',
   'rankScore': 1240,
-  'conLaiLenHang': 260,
-  'hangTiepTheo': 'Hổ',
-  'tienTrinhHang': 0.13,
+  'conLaiLenHang': 110,
+  'hangTiepTheo': 'Gấu',
+  'tienTrinhHang': 0.27,
   'diemTrungBinh': 8.2,
   'luotLam': 17,
   'tranThang': 6,
@@ -82,12 +82,11 @@ class _Mh03HoSoScreenState extends State<Mh03HoSoScreen> {
                 children: [
                   Row(
                     children: [
-                      Expanded(
-                        child: Text(
-                          'Hạng: ${_mockHoSo['hangConVat']}',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                        ),
-                      ),
+                      const Text('Hạng', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                      const SizedBox(width: 8),
+                      // Icon rank theo bộ icon T12 (assets/icons/rank/)
+                      Image.asset('assets/icons/rank/rank_ngua.png', width: 28, height: 28),
+                      const Spacer(),
                       Text(
                         '${_mockHoSo['rankScore']} điểm',
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kPrimary),
@@ -102,9 +101,17 @@ class _Mh03HoSoScreenState extends State<Mh03HoSoScreen> {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Còn ${_mockHoSo['conLaiLenHang']} điểm tới hạng ${_mockHoSo['hangTiepTheo']}',
-                    style: const TextStyle(fontSize: 13, color: kTextSub),
+                  Text.rich(
+                    TextSpan(
+                      style: const TextStyle(fontSize: 13, color: kTextSub),
+                      children: [
+                        TextSpan(text: 'Còn ${_mockHoSo['conLaiLenHang']} điểm tới hạng '),
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: Image.asset('assets/icons/rank/rank_gau.png', width: 18, height: 18),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

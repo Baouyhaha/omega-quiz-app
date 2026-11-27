@@ -4,7 +4,10 @@ import '../core/app_theme.dart';
 import '../core/uy_theme.dart';
 import '../models/topic.dart';
 import '../services/topic_service.dart';
+import 'mh03_ho_so_screen.dart';
+import 'mh05_chu_de_screen.dart';
 import 'mh07_danh_sach_bo_de_screen.dart';
+import 'mh20_tao_sua_chu_de_screen.dart';
 
 class Mh06ChiTietChuDeScreen extends StatefulWidget {
   final String token;
@@ -35,6 +38,19 @@ class _Mh06ChiTietChuDeScreenState extends State<Mh06ChiTietChuDeScreen> {
     _service = TopicService(widget.token);
     _topic = widget.topic;
     _loadExams();
+    _checkOwner();
+  }
+
+  Future<void> _checkOwner() async {
+    try {
+      final mine = await _service.getMine();
+      for (final t in mine) {
+        if (t.id == _topic.id && t.myRole != null && mounted) {
+          setState(() => _topic = _topic.copyWith(myRole: t.myRole));
+          return;
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadExams() async {
@@ -65,98 +81,58 @@ class _Mh06ChiTietChuDeScreenState extends State<Mh06ChiTietChuDeScreen> {
   }
 
   Future<void> _showForm() async {
-    final nameController = TextEditingController(text: _topic.name);
-    final descController = TextEditingController(text: _topic.description);
-    bool isPublic = _topic.isPublic;
-    bool saving = false;
-    String? formError;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Sửa chủ đề'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  hintText: 'Tên chủ đề',
-                  labelText: 'Tên chủ đề',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descController,
-                decoration: const InputDecoration(
-                  hintText: 'Mô tả',
-                  labelText: 'Mô tả',
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 12),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Công khai'),
-                subtitle: const Text('Tắt là chủ đề riêng tư'),
-                value: isPublic,
-                onChanged: (v) => setDialogState(() => isPublic = v),
-              ),
-              if (formError != null) ...[
-                const SizedBox(height: 8),
-                Text(formError!, style: const TextStyle(color: kError)),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Hủy'),
-            ),
-            ElevatedButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      final name = nameController.text.trim();
-                      if (name.isEmpty) {
-                        setDialogState(
-                          () => formError = 'Nhập tên chủ đề',
-                        );
-                        return;
-                      }
-                      setDialogState(() {
-                        saving = true;
-                        formError = null;
-                      });
-                      try {
-                        final updated = await _service.updateTopic(
-                          id: _topic.id,
-                          name: name,
-                          description: descController.text,
-                          isPublic: isPublic,
-                        );
-                        if (!ctx.mounted) return;
-                        Navigator.pop(ctx, true);
-                        setState(() => _topic = updated);
-                      } catch (e) {
-                        setDialogState(() {
-                          saving = false;
-                          formError =
-                              e.toString().replaceFirst('Exception: ', '');
-                        });
-                      }
-                    },
-              child: const Text('Lưu'),
-            ),
-          ],
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Mh20TaoSuaChuDeScreen(
+          token: widget.token,
+          topic: _topic,
         ),
       ),
     );
-    Future.delayed(const Duration(milliseconds: 300), () {
-      nameController.dispose();
-      descController.dispose();
-    });
-    if (ok == true && mounted) _showSnack('Đã sửa chủ đề');
+    if (changed == true && mounted) {
+      _showSnack('Đã sửa chủ đề');
+      Navigator.pop(context, true);
+    }
+  }
+
+  Future<void> _createExamQuick() async {
+    final titleController = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tạo bộ đề nhanh'),
+        content: TextField(
+          controller: titleController,
+          decoration: const InputDecoration(
+            hintText: 'Nhập tên bộ đề',
+            labelText: 'Tên bộ đề',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Tạo'),
+          ),
+        ],
+      ),
+    );
+    final title = titleController.text.trim();
+    titleController.dispose();
+    if (ok != true || title.isEmpty) return;
+    try {
+      await _service.createExamRandom(topicId: _topic.id, title: title);
+      if (!mounted) return;
+      _showSnack('Đã tạo bộ đề');
+      await _loadExams();
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack(e.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   Future<void> _confirmDelete() async {
@@ -261,20 +237,6 @@ class _Mh06ChiTietChuDeScreenState extends State<Mh06ChiTietChuDeScreen> {
             color: Color(0xFF1D1B2E),
           ),
         ),
-        actions: [
-          if (_topic.isOwner && !readOnly) ...[
-            IconButton(
-              icon: const Icon(Icons.edit_outlined),
-              color: const Color(0xFF1D1B2E),
-              onPressed: busy ? null : _showForm,
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              color: kError,
-              onPressed: busy ? null : _confirmDelete,
-            ),
-          ],
-        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -325,7 +287,9 @@ class _Mh06ChiTietChuDeScreenState extends State<Mh06ChiTietChuDeScreen> {
             height: 52,
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: null,
+              onPressed: readOnly
+                  ? null
+                  : () => _showSnack('Chưa có API tham gia, đang chờ Uy'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimary,
                 disabledBackgroundColor:
@@ -371,6 +335,27 @@ class _Mh06ChiTietChuDeScreenState extends State<Mh06ChiTietChuDeScreen> {
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFFFF9F1C),
+              ),
+            ),
+          ],
+          if (_topic.isOwner && !readOnly) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 48,
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _createExamQuick,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kPrimary,
+                  side: const BorderSide(color: kPrimary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text(
+                  '+ Tạo bộ đề nhanh',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
             ),
           ],
@@ -452,6 +437,52 @@ class _Mh06ChiTietChuDeScreenState extends State<Mh06ChiTietChuDeScreen> {
                 ),
               ),
             ),
+          if (_topic.isOwner && !readOnly) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: OutlinedButton(
+                      onPressed: busy ? null : _showForm,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kPrimary,
+                        side: const BorderSide(color: kPrimary),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'Sửa chủ đề',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: OutlinedButton(
+                      onPressed: busy ? null : _confirmDelete,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: kError,
+                        side: const BorderSide(color: kError),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'Xóa chủ đề',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -465,32 +496,29 @@ class _Mh06ChiTietChuDeScreenState extends State<Mh06ChiTietChuDeScreen> {
         ),
         unselectedLabelStyle: const TextStyle(fontSize: 11),
         currentIndex: 1,
+        onTap: (i) {
+          if (i == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => Mh05ChuDeScreen(token: widget.token),
+              ),
+            );
+          } else if (i == 4) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const Mh03HoSoScreen(),
+              ),
+            );
+          }
+        },
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            activeIcon: Icon(Icons.home),
-            label: 'Trang chủ',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.layers),
-            activeIcon: Icon(Icons.layers),
-            label: 'Chủ đề',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.emoji_events),
-            activeIcon: Icon(Icons.emoji_events),
-            label: 'Thi đấu',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart),
-            activeIcon: Icon(Icons.bar_chart),
-            label: 'Xếp hạng',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            activeIcon: Icon(Icons.person),
-            label: 'Hồ sơ',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
+          BottomNavigationBarItem(icon: Icon(Icons.layers_outlined), label: 'Chủ đề'),
+          BottomNavigationBarItem(icon: Icon(Icons.emoji_events_outlined), label: 'Thi đấu'),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart_outlined), label: 'Xếp hạng'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Hồ sơ'),
         ],
       ),
     );

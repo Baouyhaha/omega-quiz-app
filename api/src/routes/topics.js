@@ -95,6 +95,31 @@ router.delete('/topics/:id', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// POST topics/{id}/join — tham gia CHU DE CONG KHAI (chu de rieng tu chi di qua loi moi)
+router.post('/topics/:id/join', async (req, res, next) => {
+  try {
+    const topic = await repo.get('topics', req.params.id);
+    if (!topic) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy chủ đề');
+    if (topic.ownerId === req.user.uid) {
+      ok(res, { topicId: topic.id, myRole: 'OWNER', alreadyMember: true }, 'Bạn là chủ sở hữu chủ đề này');
+      return;
+    }
+    if (topic.visibility === 'PRIVATE') {
+      throw new ApiError(403, 'FORBIDDEN', 'Chủ đề riêng tư — chỉ tham gia bằng lời mời');
+    }
+    const key = `${topic.id}:${req.user.uid}`;
+    if (await repo.has('topicMembers', key)) {
+      ok(res, { topicId: topic.id, myRole: 'MEMBER', alreadyMember: true }, 'Đã là thành viên của chủ đề');
+      return;
+    }
+    await checkLimit(topic.ownerId, { type: 'member', topicId: topic.id, addCount: 1 });
+    await repo.put('topicMembers', key, {
+      topicId: topic.id, userId: req.user.uid, joinedAt: nowISO(),
+    });
+    ok(res, { topicId: topic.id, myRole: 'MEMBER', alreadyMember: false }, 'Đã tham gia chủ đề', 201);
+  } catch (e) { next(e); }
+});
+
 router.get('/topics/:id/members', async (req, res, next) => {
   try {
     await requireTopicOwner(req, req.params.id);
