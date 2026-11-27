@@ -280,8 +280,9 @@ class _BangXepHang extends StatelessWidget {
   }
 }
 
-/// Thẻ rank của tài khoản đang đăng nhập: con vật hiện tại, điểm,
-/// và thanh "còn X điểm nữa lên rank sau".
+/// Thẻ điểm của tài khoản đang đăng nhập: icon rank + số điểm.
+/// (Uy yêu cầu 27/11: bỏ dòng "Bạn đang là <rank>" và thanh tiến trình
+/// "còn X điểm nữa lên rank sau", chỉ hiện điểm.)
 class _TheRankCuaToi extends StatelessWidget {
   const _TheRankCuaToi();
 
@@ -291,8 +292,6 @@ class _TheRankCuaToi extends StatelessWidget {
     final diem = vm.diemCuaToi;
     final rank = vm.rankCuaToi;
     if (diem == null || rank == null) return const SizedBox.shrink();
-    final conThieu = pointsToNextRank(diem);
-    final rankSau = tenRankSau(diem);
     final textTheme = Theme.of(context).textTheme;
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -302,33 +301,13 @@ class _TheRankCuaToi extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Row(
-              children: [
-                _AvatarRank(animal: rank),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text('Bạn đang là $rank · $diem điểm',
-                      style: textTheme.titleMedium
-                          ?.copyWith(color: kTextPrimary)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            LinearProgressIndicator(
-              value: tienTrinhLenRank(diem),
-              backgroundColor: kProgressTrack,
-              color: animalColor(rank),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              conThieu == null
-                  ? 'Bạn đã đạt rank cao nhất!'
-                  : 'Còn $conThieu điểm nữa lên $rankSau',
-              style: const TextStyle(color: kTextSecondary),
-            ),
+            _AvatarRank(animal: rank),
+            const SizedBox(width: 12),
+            Text('$diem điểm',
+                style:
+                    textTheme.titleMedium?.copyWith(color: kTextPrimary)),
           ],
         ),
       ),

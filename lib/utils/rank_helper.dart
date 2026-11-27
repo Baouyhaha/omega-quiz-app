@@ -96,17 +96,17 @@ int _mocDauRank(String animal) {
 /// Icon con vật thống nhất của nhóm (assets/icons, xuất PNG từ file SVG
 /// gốc của nhóm). Màn hình dùng hàm này thay vì tự ghi đường dẫn.
 String iconRank(String animal) =>
-    _iconRank[animal] ?? 'assets/icons/rank_chuot.png';
+    _iconRank[animal] ?? 'assets/icons/rank/rank_chuot.png';
 
 const Map<String, String> _iconRank = {
-  'Chuột': 'assets/icons/rank_chuot.png',
-  'Mèo': 'assets/icons/rank_meo.png',
-  'Chó': 'assets/icons/rank_cho.png',
-  'Heo': 'assets/icons/rank_heo.png',
-  'Ngựa': 'assets/icons/rank_ngua.png',
-  'Gấu': 'assets/icons/rank_gau.png',
-  'Hổ': 'assets/icons/rank_ho.png',
-  'Sư Tử': 'assets/icons/rank_sutu.png',
-  'Voi': 'assets/icons/rank_voi.png',
-  'Cá Voi Xanh': 'assets/icons/rank_cavoi.png',
+  'Chuột': 'assets/icons/rank/rank_chuot.png',
+  'Mèo': 'assets/icons/rank/rank_meo.png',
+  'Chó': 'assets/icons/rank/rank_cho.png',
+  'Heo': 'assets/icons/rank/rank_heo.png',
+  'Ngựa': 'assets/icons/rank/rank_ngua.png',
+  'Gấu': 'assets/icons/rank/rank_gau.png',
+  'Hổ': 'assets/icons/rank/rank_ho.png',
+  'Sư Tử': 'assets/icons/rank/rank_sutu.png',
+  'Voi': 'assets/icons/rank/rank_voi.png',
+  'Cá Voi Xanh': 'assets/icons/rank/rank_cavoi.png',
 };
