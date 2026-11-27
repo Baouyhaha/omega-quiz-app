@@ -21,14 +21,19 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  ApiClient({http.Client? client}) : _client = client ?? http.Client();
+  ApiClient({http.Client? client, String? token})
+      : _client = client ?? http.Client(),
+        _token = token;
 
   final http.Client _client;
 
+  /// Token truyền riêng cho lần gọi này (ví dụ ID token vừa lấy được
+  /// ngay sau đăng nhập Google, trước khi lưu vào Session).
+  final String? _token;
+
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
-        // TODO: đổi sang Firebase ID token khi task đăng nhập T14 xong.
-        'Authorization': 'Bearer dev:danh',
+        'Authorization': 'Bearer ${_token ?? Session.token ?? 'dev:danh'}',
       };
 
   /// GET, trả về phần `data` trong envelope {success, message, data}.
