@@ -44,3 +44,8 @@ Giai đoạn này mỗi thành viên hiện thực phần giao diện được c
 2. **File mới viết từ 27/11/2026** vẫn phải: có khối chú thích đầu file theo mẫu ở mục 1; màu/kích thước lấy từ `app_theme.dart`, không gõ thêm mã màu trực tiếp trong file.
 3. Khi gộp code vào app chính, **mọi màn hình phải đăng ký vào `lib/routes.dart` của main** và điều hướng qua route đã đăng ký; trong giai đoạn làm riêng trên nhánh cá nhân thì điều hướng trực tiếp tạm chấp nhận.
 4. ViewModel theo khung MVVM rút gọn của repo là khuyến khích cho màn hình mới; **không bắt buộc hồi tố** với code đã merge (model + service theo chức năng như hiện tại vẫn được chấp nhận).
+
+## Mục 7. Công cụ tự động và thư viện giao diện (chốt 27/11/2026)
+
+1. KHÔNG tự chạy các lệnh sửa code hàng loạt trên code chung khi nhóm chưa chốt — gồm `dart fix --apply` (đặc biệt rule `migrate_design_widgets`), codegen diện rộng, và mọi lệnh đổi import/cấu trúc hàng chục file trong một lần. Thay đổi diện rộng phải thành một PR riêng, có lý do và được nhóm trưởng duyệt trước.
+2. Trạng thái hiện tại: toàn project dùng `package:flutter/material.dart`. Từ Flutter 3.50 thư viện này bị đánh dấu deprecated và hướng chính thức là chuyển sang package `material_ui`, nhưng hai thư viện là hai cây widget KHÔNG tương thích kiểu dữ liệu — trộn lẫn sẽ biên dịch qua nhưng văng lỗi lúc chạy ("No MaterialLocalizations found", "No Material widget found") mà analyze không báo. Vì vậy: code mới vẫn viết material.dart như hiện tại; việc migrate sang material_ui là một task riêng SAU buổi báo cáo 30/11/2026, làm trên nhánh riêng, có kiểm tra các package bên thứ ba (file_picker, dotted_border...) và kiểm thử toàn app trước khi gộp.
