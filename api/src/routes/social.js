@@ -183,7 +183,7 @@ router.post('/battles/:id/join', async (req, res, next) => {
 
 router.post('/battles/:id/ready', async (req, res, next) => {
   try {
-    const room = await repo.get('battleRooms', req.params.id);
+    const room = await findRoom(req.params.id);
     if (!room) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy phòng');
     if (room.hostId !== req.user.uid && room.guestId !== req.user.uid) {
       throw new ApiError(403, 'FORBIDDEN', 'Bạn không ở trong phòng này');
@@ -205,7 +205,7 @@ router.post('/battles/:id/ready', async (req, res, next) => {
 
 router.post('/battles/:id/submit', async (req, res, next) => {
   try {
-    const room = await repo.get('battleRooms', req.params.id);
+    const room = await findRoom(req.params.id);
     if (!room) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy phòng');
     const { answers, durationSeconds } = req.body || {};
     if (!Array.isArray(answers)) throw new ApiError(400, 'VALIDATION_ERROR', 'Thiếu answers');
