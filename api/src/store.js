@@ -176,6 +176,21 @@ function seedMemory() {
   db.exams.set(exam.id, exam);
   const toanQs = [...db.questions.values()].filter((q) => q.topicId === tToan.id).slice(0, 10);
   toanQs.forEach((q, i) => db.examQuestions.set(`${exam.id}:${q.id}`, { examId: exam.id, questionId: q.id, order: i }));
+
+  // --- Bo de mau 2: khong hien dap an sau nop (phuc vu T23 kiem thu
+  // man Ket qua/Xem lai voi showAnswerMode = NEVER) ---
+  const examNever = {
+    id: 'exam_khongdapan', topicId: tToan.id, ownerId: 'uy',
+    title: 'Đề mẫu — Không hiện đáp án', description: 'Đề mẫu phục vụ kiểm thử T23', createdAt: nowISO(),
+    settings: {
+      openAt: null, closeAt: null, durationMinutes: 20, maxAttempts: 3, pin: null,
+      shuffleQuestions: true, shuffleOptions: true, allowHelpers: true,
+      showAnswerMode: 'NEVER', publishScore: true,
+    },
+  };
+  db.exams.set(examNever.id, examNever);
+  const toanQs2 = [...db.questions.values()].filter((q) => q.topicId === tToan.id).slice(10, 20);
+  toanQs2.forEach((q, i) => db.examQuestions.set(`${examNever.id}:${q.id}`, { examId: examNever.id, questionId: q.id, order: i }));
 }
 
 // ---------- Lop truy cap du lieu (repo) ----------
