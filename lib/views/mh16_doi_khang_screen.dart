@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
 import '../core/uy_theme.dart';
+import '../utils/rank_helper.dart';
 import '../widgets/nut_chinh_widget.dart';
 
 // ============================================================
@@ -163,8 +164,8 @@ class Mh16DoiKhangScreen extends StatelessWidget {
                             const Text('Uy', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                             Row(
                               children: [
-                                // Icon rank theo bộ icon T12 (assets/icons/rank/)
-                                Image.asset('assets/icons/rank/rank_ngua.png', width: 20, height: 20),
+                                // Icon rank qua iconRank() — chuẩn Mục 8
+                                Image.asset(iconRank('Ngựa'), width: 20, height: 20),
                                 const SizedBox(width: 6),
                                 const Text('1240 điểm', style: TextStyle(color: kTextSub)),
                               ],

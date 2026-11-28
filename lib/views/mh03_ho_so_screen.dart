@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/uy_theme.dart';
 import '../routes.dart';
+import '../services/session.dart';
+import '../utils/rank_helper.dart';
 
 // ============================================================
 // MH-03 — Hồ sơ cá nhân
 // Luồng: L1 (tài khoản), L8 (gói thuê)
 // Vào từ: tab "Hồ sơ" của khung điều hướng
-// Đi tới: MH-29 (nút Xem gói), MH-01 (đăng xuất)
+// Đi tới: MH-29 (nút Xem gói), MH-30 (mục Quản trị nền tảng —
+//         chỉ hiện khi tài khoản là Admin, luồng L9 đã chốt 24/11),
+//         MH-01 (đăng xuất)
 // Bố cục: dựng theo mockup Figma MH-03-ho-so (avatar tròn giữa màn,
 //         thẻ hạng có thanh tiến trình, 3 chỉ số, hàng trạng thái gói,
 //         mục Cài đặt có hàng ASMR để mờ kèm nhãn "Sắp có")
@@ -85,7 +89,7 @@ class _Mh03HoSoScreenState extends State<Mh03HoSoScreen> {
                       const Text('Hạng', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                       const SizedBox(width: 8),
                       // Icon rank theo bộ icon T12 (assets/icons/rank/)
-                      Image.asset('assets/icons/rank/rank_ngua.png', width: 28, height: 28),
+                      Image.asset(iconRank(_mockHoSo['hangConVat'] as String), width: 28, height: 28),
                       const Spacer(),
                       Text(
                         '${_mockHoSo['rankScore']} điểm',
@@ -108,7 +112,7 @@ class _Mh03HoSoScreenState extends State<Mh03HoSoScreen> {
                         TextSpan(text: 'Còn ${_mockHoSo['conLaiLenHang']} điểm tới hạng '),
                         WidgetSpan(
                           alignment: PlaceholderAlignment.middle,
-                          child: Image.asset('assets/icons/rank/rank_gau.png', width: 18, height: 18),
+                          child: Image.asset(iconRank(_mockHoSo['hangTiepTheo'] as String), width: 18, height: 18),
                         ),
                       ],
                     ),
@@ -159,6 +163,20 @@ class _Mh03HoSoScreenState extends State<Mh03HoSoScreen> {
               ),
             ),
           ),
+          // Điểm vào khu Admin (L9): chỉ hiện với tài khoản Admin
+          // nền tảng, đi thẳng MH-30 — không thêm mục vào thanh dưới.
+          if (Session.laAdmin) ...[
+            const SizedBox(height: 12),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.admin_panel_settings_rounded, color: kPrimary),
+                title: const Text('Quản trị nền tảng', style: TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: const Text('Tài khoản · Gói và hạn mức · Thống kê'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.pushNamed(context, AppRoutes.mh30),
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           const Text('Cài đặt', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
           const SizedBox(height: 10),

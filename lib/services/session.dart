@@ -14,6 +14,13 @@ class Session {
   static Map<String, dynamic>? get profile => _profile;
   static bool get daDangNhap => _token != null;
 
+  /// Tài khoản hiện tại có phải Admin nền tảng không (điểm vào
+  /// "Quản trị nền tảng" ở MH-03 chỉ hiện khi đúng). Hồ sơ thật lấy
+  /// role từ API; phiên dev bằng token "dev:admin" (tài khoản mẫu
+  /// Admin) cũng tính là Admin để kiểm thử được điểm vào.
+  static bool get laAdmin =>
+      _profile?['role'] == 'ADMIN' || _token == 'dev:admin';
+
   /// Nạp lại phiên đăng nhập đã lưu (gọi lúc mở app trong main()).
   static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();

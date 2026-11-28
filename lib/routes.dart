@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'views/admin_host_screen.dart';
 import 'views/khung_dieu_huong_screen.dart';
 import 'views/mh01_dang_nhap_screen.dart';
 import 'views/mh03_ho_so_screen.dart';
@@ -28,6 +29,7 @@ class AppRoutes {
   static const String mh26 = '/mh26';
   static const String mh28 = '/mh28';
   static const String mh29 = '/mh29';
+  static const String mh30 = '/mh30';
 }
 
 Map<String, WidgetBuilder> appRoutes() {
@@ -43,5 +45,6 @@ Map<String, WidgetBuilder> appRoutes() {
     AppRoutes.mh26: (_) => const Mh26CaiDatBoDeScreen(),
     AppRoutes.mh28: (_) => const Mh28DanhSachGoiScreen(),
     AppRoutes.mh29: (_) => const Mh29GoiCuaToiScreen(),
+    AppRoutes.mh30: (_) => const AdminHostScreen(),
   };
 }
