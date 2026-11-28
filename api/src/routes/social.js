@@ -188,9 +188,10 @@ router.post('/battles/:id/ready', async (req, res, next) => {
     if (room.hostId !== req.user.uid && room.guestId !== req.user.uid) {
       throw new ApiError(403, 'FORBIDDEN', 'Bạn không ở trong phòng này');
     }
+    if (room.status === 'FINISHED') throw new ApiError(409, 'VALIDATION_ERROR', 'Trận đã kết thúc');
     room.ready[req.user.uid] = true;
     let questions = null;
-    if (room.ready[room.hostId] && room.guestId && room.ready[room.guestId]) {
+    if (room.status === 'WAITING' && room.ready[room.hostId] && room.guestId && room.ready[room.guestId]) {
       room.status = 'IN_PROGRESS';
       const attempt = await startAttempt(req.user, null, room.questionIds, { topicId: room.topicId, battleId: room.id });
       room.attemptByUser = room.attemptByUser || {};
@@ -207,8 +208,15 @@ router.post('/battles/:id/submit', async (req, res, next) => {
   try {
     const room = await findRoom(req.params.id);
     if (!room) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy phòng');
+    if (room.hostId !== req.user.uid && room.guestId !== req.user.uid) {
+      throw new ApiError(403, 'FORBIDDEN', 'Bạn không ở trong phòng này');
+    }
+    if (room.status === 'FINISHED') throw new ApiError(409, 'VALIDATION_ERROR', 'Trận đã kết thúc');
+    if (room.status !== 'IN_PROGRESS') throw new ApiError(400, 'VALIDATION_ERROR', 'Trận chưa bắt đầu');
     const { answers, durationSeconds } = req.body || {};
     if (!Array.isArray(answers)) throw new ApiError(400, 'VALIDATION_ERROR', 'Thiếu answers');
+    room.submissions = room.submissions || {};
+    if (room.submissions[req.user.uid]) throw new ApiError(409, 'VALIDATION_ERROR', 'Bạn đã nộp bài rồi');
     let correct = 0;
     const details = [];
     for (const qid of room.questionIds) {
@@ -224,7 +232,6 @@ router.post('/battles/:id/submit', async (req, res, next) => {
         });
       }
     }
-    room.submissions = room.submissions || {};
     room.submissions[req.user.uid] = { correct, durationSeconds: durationSeconds || 0, at: nowISO(), details };
     if (room.submissions[room.hostId] && room.guestId && room.submissions[room.guestId]) {
       room.status = 'FINISHED';

@@ -174,6 +174,7 @@ router.post('/attempts/:id/submit', async (req, res, next) => {
     const attempt = await repo.get('attempts', req.params.id);
     if (!attempt || attempt.userId !== req.user.uid) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy lượt làm');
     if (attempt.status === 'SUBMITTED') throw new ApiError(409, 'VALIDATION_ERROR', 'Lượt làm đã nộp rồi');
+    if (attempt.status === 'FORCE_SUBMITTED') throw new ApiError(409, 'VALIDATION_ERROR', 'Bài đã bị nộp cưỡng bức do vi phạm, không thể nộp lại');
     const { answers, durationSeconds } = req.body || {};
     if (!Array.isArray(answers)) throw new ApiError(400, 'VALIDATION_ERROR', 'Thiếu answers');
     const g = await grade(attempt, answers, durationSeconds);
