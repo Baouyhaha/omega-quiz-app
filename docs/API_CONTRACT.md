@@ -69,6 +69,7 @@ Khi lỗi: `"success": false`, `"data": null`, `message` là thông điệp ngư
 | GET | `exams/{id}` | Chi tiết bộ đề + cài đặt hiển thị cho người làm |
 | PATCH | `exams/{id}` | Sửa thông tin bộ đề |
 | PATCH | `exams/{id}/settings` | Cài đặt: openAt/closeAt, durationMinutes, maxAttempts, pin, shuffleQuestions, shuffleOptions, allowHelpers, showAnswerMode (IMMEDIATELY / AFTER_CLOSE / NEVER), publishScore |
+| DELETE | `exams/{id}` | Xóa bộ đề (chỉ chủ sở hữu; xóa kèm liên kết câu hỏi, lượt làm và yêu thích của bộ đề; đợt thi đã chốt câu riêng nên không bị ảnh hưởng) |
 
 ### 2.5 Làm bài, trợ giúp, kết quả (UC13–UC18)
 | Method | Endpoint | Mô tả |

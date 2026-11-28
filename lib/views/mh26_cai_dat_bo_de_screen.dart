@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
 import '../core/uy_theme.dart';
+import '../services/api_client.dart';
 import '../widgets/nut_chinh_widget.dart';
 
 // ============================================================
@@ -13,11 +14,21 @@ import '../widgets/nut_chinh_widget.dart';
 //         cài đặt dạng thẻ trắng: nhãn trái, giá trị phải; 4 hàng
 //         công tắc; hàng Mã PIN có chip 1234; nút Lưu cài đặt
 //         dính đáy màn hình)
+// Nút "Xóa bộ đề" ở cuối danh sách (chốt bổ sung 28/11/2026):
+//   gọi DELETE exams/{id}, chỉ chủ sở hữu; hộp xác nhận ghi rõ
+//   lượt làm và yêu thích gắn với bộ đề cũng bị xóa.
 // Dữ liệu giả: giá trị mẫu hiển thị trong từng hàng dưới đây
 // Chức năng thật nối ở: T20 (lưu settings dạng map trong exams)
 // ============================================================
 class Mh26CaiDatBoDeScreen extends StatefulWidget {
-  const Mh26CaiDatBoDeScreen({super.key});
+  const Mh26CaiDatBoDeScreen({super.key, this.examId, this.tenBoDe});
+
+  /// Mã bộ đề thật (khi vào từ MH-08 của chủ sở hữu). Để trống khi
+  /// chạy bản giao diện xem thử — nút xóa khi đó chỉ hiện hộp xác nhận.
+  final String? examId;
+
+  /// Tên bộ đề, hiện trong hộp xác nhận xóa.
+  final String? tenBoDe;
 
   @override
   State<Mh26CaiDatBoDeScreen> createState() => _Mh26CaiDatBoDeScreenState();
@@ -73,6 +84,20 @@ class _Mh26CaiDatBoDeScreenState extends State<Mh26CaiDatBoDeScreen> {
                 ),
                 _HangGiaTri(nhan: 'Hiện đáp án', giaTri: 'Sau khi nộp'),
                 _HangGiaTri(nhan: 'Công bố điểm', giaTri: 'Ngay sau khi nộp'),
+                const SizedBox(height: 24),
+                OutlinedButton.icon(
+                  onPressed: _xacNhanXoaBoDe,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  label: const Text('Xóa bộ đề'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kError,
+                    side: const BorderSide(color: kError),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -92,6 +117,55 @@ class _Mh26CaiDatBoDeScreenState extends State<Mh26CaiDatBoDeScreen> {
         ],
       ),
     );
+  }
+
+  /// Hộp xác nhận xóa bộ đề. Có examId thì gọi API xóa thật rồi
+  /// quay lại màn trước; chưa gắn bộ đề (bản giao diện) thì chỉ báo.
+  Future<void> _xacNhanXoaBoDe() async {
+    final ten = widget.tenBoDe ?? 'Bộ đề giữa kỳ';
+    final dongY = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xóa bộ đề?'),
+        content: Text(
+          'Xóa bộ đề "$ten"? Các lượt làm và mục yêu thích gắn với '
+          'bộ đề này cũng bị xóa. Không hoàn tác được.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: kError),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+    if (dongY != true || !mounted) return;
+    if (widget.examId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bản giao diện: chưa gắn bộ đề thật để xóa.'),
+        ),
+      );
+      return;
+    }
+    try {
+      await ApiClient().delete('exams/${widget.examId}');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã xóa bộ đề.')),
+      );
+      Navigator.pop(context);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    }
   }
 }
 

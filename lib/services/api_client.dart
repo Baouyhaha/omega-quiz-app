@@ -59,6 +59,13 @@ class ApiClient {
     return _unwrap(res);
   }
 
+  /// DELETE, trả về phần `data` trong envelope.
+  Future<dynamic> delete(String path) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final res = await _client.delete(uri, headers: _headers);
+    return _unwrap(res);
+  }
+
   /// Bóc envelope: success=true thì trả data, success=false thì ném lỗi.
   dynamic _unwrap(http.Response res) {
     final json = jsonDecode(res.body) as Map<String, dynamic>;

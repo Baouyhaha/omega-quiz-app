@@ -93,6 +93,27 @@ router.patch('/exams/:id/settings', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+router.delete('/exams/:id', async (req, res, next) => {
+  try {
+    const exam = await repo.get('exams', req.params.id);
+    if (!exam) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy bộ đề');
+    assertTopicWritable(await requireTopicOwner(req, exam.topicId));
+    // Xóa kèm: liên kết câu hỏi, lượt làm và mục yêu thích của bộ đề.
+    // Đợt thi (contests) đã chốt danh sách câu riêng nên không bị ảnh hưởng.
+    for (const x of (await repo.all('examQuestions')).filter((x) => x.examId === exam.id)) {
+      await repo.del('examQuestions', `${x.examId}:${x.questionId}`);
+    }
+    for (const a of (await repo.all('attempts')).filter((a) => a.examId === exam.id)) {
+      await repo.del('attempts', a.id);
+    }
+    for (const f of (await repo.all('favorites')).filter((f) => f.examId === exam.id)) {
+      await repo.del('favorites', `${f.userId}:${f.examId}`);
+    }
+    await repo.del('exams', exam.id);
+    ok(res, { deleted: true }, 'Đã xóa bộ đề');
+  } catch (e) { next(e); }
+});
+
 router.post('/exams/:id/favorite', async (req, res, next) => {
   try {
     if (!(await repo.get('exams', req.params.id))) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy bộ đề');
