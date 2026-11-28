@@ -20,6 +20,11 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// Thời gian chờ tối đa cho một lần gọi API. Không có timeout thì
+/// khi máy ảo không tới được API (hoặc API treo), nút đăng nhập quay
+/// mãi không báo lỗi — có timeout, app báo lỗi rõ ràng sau 15 giây.
+const Duration _thoiGianChoToiDa = Duration(seconds: 15);
+
 class ApiClient {
   ApiClient({http.Client? client, String? token})
       : _client = client ?? http.Client(),
@@ -39,7 +44,7 @@ class ApiClient {
   /// GET, trả về phần `data` trong envelope {success, message, data}.
   Future<dynamic> get(String path, {Map<String, String>? query}) async {
     final uri = Uri.parse('$baseUrl$path').replace(queryParameters: query);
-    final res = await _client.get(uri, headers: _headers);
+    final res = await _client.get(uri, headers: _headers).timeout(_thoiGianChoToiDa);
     return _unwrap(res);
   }
 
@@ -47,7 +52,7 @@ class ApiClient {
   Future<dynamic> post(String path, [Map<String, dynamic>? body]) async {
     final uri = Uri.parse('$baseUrl$path');
     final res = await _client.post(uri,
-        headers: _headers, body: body == null ? null : jsonEncode(body));
+        headers: _headers, body: body == null ? null : jsonEncode(body)).timeout(_thoiGianChoToiDa);
     return _unwrap(res);
   }
 
@@ -55,14 +60,14 @@ class ApiClient {
   Future<dynamic> patch(String path, [Map<String, dynamic>? body]) async {
     final uri = Uri.parse('$baseUrl$path');
     final res = await _client.patch(uri,
-        headers: _headers, body: body == null ? null : jsonEncode(body));
+        headers: _headers, body: body == null ? null : jsonEncode(body)).timeout(_thoiGianChoToiDa);
     return _unwrap(res);
   }
 
   /// DELETE, trả về phần `data` trong envelope.
   Future<dynamic> delete(String path) async {
     final uri = Uri.parse('$baseUrl$path');
-    final res = await _client.delete(uri, headers: _headers);
+    final res = await _client.delete(uri, headers: _headers).timeout(_thoiGianChoToiDa);
     return _unwrap(res);
   }
 

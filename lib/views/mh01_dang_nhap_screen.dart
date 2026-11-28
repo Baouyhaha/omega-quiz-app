@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
@@ -53,6 +55,10 @@ class _Mh01DangNhapScreenState extends State<Mh01DangNhapScreen> {
     if (e is ApiException) return e.message;
     final s = e.toString();
     if (s.contains('Đã hủy')) return 'Đã hủy đăng nhập';
+    if (e is TimeoutException) {
+      return 'Máy chủ không phản hồi sau 15 giây. Kiểm tra API đã chạy '
+          'trên máy (kèm khóa Firebase) rồi thử lại';
+    }
     if (s.contains('network') || s.contains('SocketException')) {
       return 'Lỗi mạng, kiểm tra kết nối rồi thử lại';
     }
