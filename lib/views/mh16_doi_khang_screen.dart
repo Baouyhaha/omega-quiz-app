@@ -25,7 +25,9 @@ import '../widgets/nut_chinh_widget.dart';
 //         thái phòng từ server mỗi 2–3 giây (không websocket).
 // API: POST battles · POST battles/{mã}/join · POST
 //         battles/{id}/ready · GET battles/{id} · POST
-//         battles/{id}/progress · POST battles/{id}/submit
+//         battles/{id}/progress · POST battles/{id}/submit ·
+//         POST battles/{id}/forfeit (bỏ trận: thua −10, đối
+//         thủ thắng mặc định +15; màn kết quả có điểm từng câu)
 // ============================================================
 
 enum _GiaiDoan { sanh, cho, thi, choKetQua, ketQua }
@@ -218,7 +220,8 @@ class _Mh16DoiKhangScreenState extends State<Mh16DoiKhangScreen> {
         final qs = data['questions'] as List<dynamic>?;
         setState(() => _phong = data);
         if (qs != null) _vaoTran(qs);
-      } else if (_gd == _GiaiDoan.choKetQua && status == 'FINISHED') {
+      } else if ((_gd == _GiaiDoan.choKetQua || _gd == _GiaiDoan.thi) &&
+          status == 'FINISHED') {
         _timer?.cancel();
         setState(() {
           _phong = data;
@@ -332,6 +335,48 @@ class _Mh16DoiKhangScreenState extends State<Mh16DoiKhangScreen> {
             : _GiaiDoan.choKetQua;
       });
       if (_gd == _GiaiDoan.choKetQua) _batPoll(const Duration(seconds: 2));
+    } catch (e) {
+      _baoLoi(e);
+    } finally {
+      if (mounted) setState(() => _dangXuLy = false);
+    }
+  }
+
+  /// Bỏ trận giữa chừng: mình tính thua −10, đối thủ thắng
+  /// mặc định +15 (POST battles/{id}/forfeit).
+  Future<void> _boTran() async {
+    final dongY = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Bỏ trận?'),
+        content: const Text(
+          'Bỏ trận sẽ tính bạn thua trận này (−10 điểm xếp hạng) '
+          'và đối thủ thắng mặc định (+15).',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Thi tiếp'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: kError),
+            child: const Text('Bỏ trận'),
+          ),
+        ],
+      ),
+    );
+    if (dongY != true || !mounted) return;
+    setState(() => _dangXuLy = true);
+    try {
+      final data = await ApiClient().post('battles/${_phong!['id']}/forfeit', {})
+          as Map<String, dynamic>;
+      if (!mounted) return;
+      _timer?.cancel();
+      setState(() {
+        _phong = data;
+        _gd = _GiaiDoan.ketQua;
+      });
     } catch (e) {
       _baoLoi(e);
     } finally {
@@ -740,6 +785,15 @@ class _Mh16DoiKhangScreenState extends State<Mh16DoiKhangScreen> {
               ),
             ),
           ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: _dangXuLy ? null : _boTran,
+            icon: const Icon(Icons.flag_rounded, size: 18),
+            label: const Text('Bỏ trận'),
+            style: TextButton.styleFrom(foregroundColor: kError),
+          ),
+        ),
         const SizedBox(height: 6),
         Row(
           children: [
@@ -789,6 +843,91 @@ class _Mh16DoiKhangScreenState extends State<Mh16DoiKhangScreen> {
               textAlign: TextAlign.center,
               style: const TextStyle(color: kTextSub),
             ),
+            const SizedBox(height: 18),
+            OutlinedButton.icon(
+              onPressed: _dangXuLy ? null : _boTran,
+              icon: const Icon(Icons.flag_rounded, size: 18),
+              label: const Text('Bỏ trận (nhận thua)'),
+              style: OutlinedButton.styleFrom(foregroundColor: kError),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Bảng điểm từng câu ở màn kết quả: mỗi dòng là 1 câu, cột
+  /// "Bạn" và "Đối thủ" đánh dấu đúng/sai. Dữ liệu lấy từ
+  /// results.submissions[uid].details do server trả sau khi
+  /// trận kết thúc (trước đó không lộ đáp án).
+  Widget _chiTietTungCau(Map<String, dynamic> subs) {
+    final mySub = subs[_myUid] as Map<String, dynamic>?;
+    Map<String, dynamic>? opSub;
+    for (final p in _players) {
+      final m = p as Map<String, dynamic>;
+      if (m['uid'] != _myUid) opSub = subs[m['uid']] as Map<String, dynamic>?;
+    }
+    List<Map<String, dynamic>> detailsOf(Map<String, dynamic>? sub) =>
+        ((sub?['details'] as List<dynamic>?) ?? const [])
+            .cast<Map<String, dynamic>>();
+    final myDetails = detailsOf(mySub);
+    final opDetails = detailsOf(opSub);
+    final base = myDetails.isNotEmpty ? myDetails : opDetails;
+    if (base.isEmpty) return const SizedBox.shrink();
+    final opById = {for (final d in opDetails) d['questionId'] as String: d};
+    final myById = {for (final d in myDetails) d['questionId'] as String: d};
+    Widget dau(bool? dung) {
+      if (dung == null) {
+        return const Icon(Icons.remove_circle_outline, color: kTextSub, size: 20);
+      }
+      return dung
+          ? const Icon(Icons.check_circle_rounded, color: kSuccess, size: 20)
+          : const Icon(Icons.cancel_rounded, color: kError, size: 20);
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(top: 2, bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Chi tiết từng câu',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 10),
+            const Row(
+              children: [
+                SizedBox(width: 44, child: Text('Câu', style: TextStyle(color: kTextSub, fontSize: 13))),
+                Expanded(child: Text('Nội dung', style: TextStyle(color: kTextSub, fontSize: 13))),
+                SizedBox(width: 40, child: Text('Bạn', textAlign: TextAlign.center, style: TextStyle(color: kTextSub, fontSize: 13))),
+                SizedBox(width: 52, child: Text('Đối thủ', textAlign: TextAlign.center, style: TextStyle(color: kTextSub, fontSize: 13))),
+              ],
+            ),
+            const Divider(),
+            for (var i = 0; i < base.length; i++)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 5),
+                child: Row(
+                  children: [
+                    SizedBox(width: 44, child: Text('${i + 1}', style: const TextStyle(fontWeight: FontWeight.w700))),
+                    Expanded(
+                      child: Text(
+                        base[i]['content'] as String? ?? '',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    SizedBox(
+                      width: 40,
+                      child: Center(child: dau(myById[base[i]['questionId']]?['correct'] as bool?)),
+                    ),
+                    SizedBox(
+                      width: 52,
+                      child: Center(child: dau(opById[base[i]['questionId']]?['correct'] as bool?)),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -839,6 +978,15 @@ class _Mh16DoiKhangScreenState extends State<Mh16DoiKhangScreen> {
                     color: deltaToi > 0 ? kSuccess : (deltaToi < 0 ? kError : kTextSub),
                   ),
                 ),
+                if (results?['forfeitedBy'] != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    results!['forfeitedBy'] == _myUid
+                        ? 'Bạn đã bỏ trận giữa chừng'
+                        : 'Đối thủ bỏ trận — bạn thắng mặc định',
+                    style: const TextStyle(color: kTextSub),
+                  ),
+                ],
               ],
             ),
           ),
@@ -877,6 +1025,7 @@ class _Mh16DoiKhangScreenState extends State<Mh16DoiKhangScreen> {
               ),
             );
           }),
+        _chiTietTungCau(subs),
         const SizedBox(height: 8),
         NutChinh(
           text: 'Chơi trận mới',

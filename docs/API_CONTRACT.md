@@ -94,7 +94,8 @@ Khi lỗi: `"success": false`, `"data": null`, `message` là thông điệp ngư
 | POST | `battles` | Tạo phòng đối kháng 1-1: `{ "topicId": "...", "questionCount": 10 }` — **máy chủ rút ngẫu nhiên câu hỏi từ kho của chủ đề** và chốt vào phòng |
 | POST | `battles/{id}/join` | Vào phòng bằng mã phòng |
 | POST | `battles/{id}/ready` | Sẵn sàng; cả hai sẵn sàng → phòng bắt đầu |
-| POST | `battles/{id}/submit` | Nộp bài trong trận → khi cả hai đã nộp, máy chủ tổng kết và cộng/trừ rankScore (+15/0/−10) |
+| POST | `battles/{id}/submit` | Nộp bài trong trận → khi cả hai đã nộp, máy chủ tổng kết và cộng/trừ rankScore (+15/0/−10). `results.submissions[uid].details` có chi tiết từng câu (câu hỏi, đáp án đã chọn, đáp án đúng) — chỉ trả khi trận đã kết thúc |
+| POST | `battles/{id}/forfeit` | Bỏ trận giữa chừng (chỉ khi trận đang diễn ra): người bỏ cuộc tính thua −10, đối thủ thắng mặc định +15; `results.forfeitedBy` ghi người bỏ cuộc |
 | GET | `battles/{id}` | Xem trạng thái phòng (app gọi lặp lại): người chơi + sẵn sàng + tiến độ đối thủ; trận đang diễn ra thì trả kèm câu hỏi (không đáp án) và tạo lượt làm nếu chưa có |
 | POST | `battles/{id}/progress` | Báo tiến độ của mình: `{ "answeredCount": 5 }` để đối thủ thấy đã làm mấy câu |
 

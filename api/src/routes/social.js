@@ -210,13 +210,22 @@ router.post('/battles/:id/submit', async (req, res, next) => {
     const { answers, durationSeconds } = req.body || {};
     if (!Array.isArray(answers)) throw new ApiError(400, 'VALIDATION_ERROR', 'Thiếu answers');
     let correct = 0;
+    const details = [];
     for (const qid of room.questionIds) {
       const q = await repo.get('questions', qid);
       const a = answers.find((x) => x.questionId === qid);
-      if (q && a && a.selectedOption === q.correctOption) correct++;
+      const isCorrect = !!(q && a && a.selectedOption === q.correctOption);
+      if (isCorrect) correct++;
+      if (q) {
+        details.push({
+          questionId: qid, content: q.content,
+          selectedOption: a ? a.selectedOption : null,
+          correctOption: q.correctOption, correct: isCorrect,
+        });
+      }
     }
     room.submissions = room.submissions || {};
-    room.submissions[req.user.uid] = { correct, durationSeconds: durationSeconds || 0, at: nowISO() };
+    room.submissions[req.user.uid] = { correct, durationSeconds: durationSeconds || 0, at: nowISO(), details };
     if (room.submissions[room.hostId] && room.guestId && room.submissions[room.guestId]) {
       room.status = 'FINISHED';
       const h = room.submissions[room.hostId];
@@ -237,6 +246,35 @@ router.post('/battles/:id/submit', async (req, res, next) => {
     }
     await repo.put('battleRooms', room.id, room);
     ok(res, await battleView(room), room.status === 'FINISHED' ? 'Trận đấu đã kết thúc' : 'Đã ghi nhận bài nộp, chờ đối thủ');
+  } catch (e) { next(e); }
+});
+
+// Bo tran giua chung: nguoi bo cuoc tinh thua, doi thu thang mac dinh
+// (+15/-10 nhu thang/thua thuong). Chi ap dung khi tran dang dien ra.
+router.post('/battles/:id/forfeit', async (req, res, next) => {
+  try {
+    const room = await findRoom(req.params.id);
+    if (!room) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy phòng');
+    if (room.hostId !== req.user.uid && room.guestId !== req.user.uid) {
+      throw new ApiError(403, 'FORBIDDEN', 'Bạn không ở trong phòng này');
+    }
+    if (room.status === 'FINISHED') throw new ApiError(409, 'VALIDATION_ERROR', 'Trận đã kết thúc');
+    if (room.status !== 'IN_PROGRESS') throw new ApiError(400, 'VALIDATION_ERROR', 'Trận chưa bắt đầu, dùng Hủy/Rời phòng thay vì Bỏ trận');
+    const loser = req.user.uid;
+    const winner = loser === room.hostId ? room.guestId : room.hostId;
+    const deltas = {};
+    for (const uid of [room.hostId, room.guestId]) {
+      deltas[uid] = uid === winner ? 15 : -10;
+      const u = await repo.get('users', uid);
+      if (u) {
+        u.rankScore = Math.max(0, u.rankScore + deltas[uid]);
+        await repo.put('users', uid, u);
+      }
+    }
+    room.status = 'FINISHED';
+    room.results = { winner, deltas, submissions: room.submissions || {}, forfeitedBy: loser };
+    await repo.put('battleRooms', room.id, room);
+    ok(res, await battleView(room), 'Đã bỏ trận — đối thủ thắng mặc định');
   } catch (e) { next(e); }
 });
 
