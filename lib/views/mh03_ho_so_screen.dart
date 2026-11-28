@@ -177,18 +177,6 @@ class _Mh03HoSoScreenState extends State<Mh03HoSoScreen> {
               ),
             ),
           ],
-          const SizedBox(height: 12),
-          // Điểm vào MH-13 Ôn tập câu sai (T24): hiện với mọi
-          // người dùng, dữ liệu là danh sách câu sai của chính mình.
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.school_rounded, color: kPrimary),
-              title: const Text('Ôn tập câu sai', style: TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: const Text('Học và ôn lại các câu đã trả lời sai'),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => Navigator.pushNamed(context, AppRoutes.mh13),
-            ),
-          ),
           const SizedBox(height: 18),
           const Text('Cài đặt', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
           const SizedBox(height: 10),
