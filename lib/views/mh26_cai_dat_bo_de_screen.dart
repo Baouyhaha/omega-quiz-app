@@ -17,6 +17,10 @@ import '../widgets/nut_chinh_widget.dart';
 // Nút "Xóa bộ đề" ở cuối danh sách (chốt bổ sung 28/11/2026):
 //   gọi DELETE exams/{id}, chỉ chủ sở hữu; hộp xác nhận ghi rõ
 //   lượt làm và yêu thích gắn với bộ đề cũng bị xóa.
+// Lưu cài đặt: ĐÃ nối ở T20 — có examId thì PATCH
+//   exams/{id}/settings với các mục màn này điều khiển được
+//   (PIN, xáo trộn câu/đáp án, cho phép trợ giúp); các hàng
+//   giá trị còn lại đang là hiển thị mẫu theo mockup.
 // Dữ liệu giả: giá trị mẫu hiển thị trong từng hàng dưới đây
 // Chức năng thật nối ở: T20 (lưu settings dạng map trong exams)
 // ============================================================
@@ -35,6 +39,7 @@ class Mh26CaiDatBoDeScreen extends StatefulWidget {
 }
 
 class _Mh26CaiDatBoDeScreenState extends State<Mh26CaiDatBoDeScreen> {
+  bool _dangLuu = false;
   bool _batPin = true;
   bool _xaoTronCau = true;
   bool _xaoTronDapAn = true;
@@ -104,19 +109,47 @@ class _Mh26CaiDatBoDeScreenState extends State<Mh26CaiDatBoDeScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: NutChinh(
-              text: 'Lưu cài đặt',
+              text: _dangLuu ? 'Đang lưu...' : 'Lưu cài đặt',
               icon: Icons.save_rounded,
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đã lưu cài đặt (bản giao diện, chưa lưu thật).')),
-                );
-                Navigator.pop(context);
-              },
+              onPressed: _dangLuu ? () {} : _bamLuuCaiDat,
             ),
           ),
         ],
       ),
     );
+  }
+
+  /// Lưu cài đặt thật qua API khi màn đã gắn bộ đề (examId);
+  /// bản giao diện xem thử giữ thông báo mẫu như trước.
+  Future<void> _bamLuuCaiDat() async {
+    if (widget.examId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã lưu cài đặt (bản giao diện, chưa lưu thật).')),
+      );
+      Navigator.pop(context);
+      return;
+    }
+    setState(() => _dangLuu = true);
+    try {
+      await ApiClient().patch('exams/${widget.examId}/settings', {
+        'pin': _batPin ? '1234' : null,
+        'shuffleQuestions': _xaoTronCau,
+        'shuffleOptions': _xaoTronDapAn,
+        'allowHelpers': _choTroGiup,
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã lưu cài đặt.')),
+      );
+      Navigator.pop(context);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _dangLuu = false);
+    }
   }
 
   /// Hộp xác nhận xóa bộ đề. Có examId thì gọi API xóa thật rồi

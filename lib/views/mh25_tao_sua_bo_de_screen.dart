@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/uy_theme.dart';
 import '../routes.dart';
+import '../services/api_client.dart';
+import 'mh26_cai_dat_bo_de_screen.dart';
 import '../widgets/nut_chinh_widget.dart';
 
 // ============================================================
@@ -15,9 +17,11 @@ import '../widgets/nut_chinh_widget.dart';
 //         Dễ 8 / Trung bình 8 / Khó 4, tổng 20 câu, nút Tạo bộ đề
 //         dính đáy màn hình)
 // Dữ liệu giả: _mockCauHoi ngay dưới đây (chỉ hiện khi chọn
-//             Ghép thủ công)
-// Chức năng thật nối ở: T20 (tạo bộ đề: ghép thủ công hoặc
-//             trích ngẫu nhiên theo mức độ)
+//             Ghép thủ công ở bản xem thử chưa gắn chủ đề)
+// Chức năng thật: ĐÃ nối ở T20 — có topicId thì tạo thật qua
+//             POST topics/{topicId}/exams (ngẫu nhiên theo số câu
+//             từng mức, hoặc ghép thủ công từ kho câu của chủ đề);
+//             có examId (vào từ Sửa) thì chỉ PATCH lại tên bộ đề.
 // ============================================================
 
 // MOCK: vai cau hoi cua chu de Toan cao cap de ghep thu cong
@@ -30,7 +34,17 @@ const _mockCauHoi = [
 ];
 
 class Mh25TaoSuaBoDeScreen extends StatefulWidget {
-  const Mh25TaoSuaBoDeScreen({super.key});
+  const Mh25TaoSuaBoDeScreen({super.key, this.topicId, this.examId, this.tenCoSan});
+
+  /// Chủ đề sẽ chứa bộ đề (vào từ MH-07 của chủ sở hữu). Để trống
+  /// khi chạy bản giao diện xem thử — khi đó dùng dữ liệu mẫu.
+  final String? topicId;
+
+  /// Mã bộ đề khi vào từ nút Sửa ở MH-08: màn chuyển sang lưu tên.
+  final String? examId;
+
+  /// Tên bộ đề có sẵn (hiện sẵn trong ô tên khi sửa).
+  final String? tenCoSan;
 
   @override
   State<Mh25TaoSuaBoDeScreen> createState() => _Mh25TaoSuaBoDeScreenState();
@@ -40,11 +54,161 @@ class _Mh25TaoSuaBoDeScreenState extends State<Mh25TaoSuaBoDeScreen> {
   // 0: trich ngau nhien, 1: ghep thu cong
   int _cachTao = 0;
   final Set<int> _cauDaChon = {0, 1};
+  final _tenController = TextEditingController();
+  final _deController = TextEditingController(text: '8');
+  final _tbController = TextEditingController(text: '8');
+  final _khoController = TextEditingController(text: '4');
+  bool _dangTao = false;
+  // Kho cau hoi that cua chu de (ghep thu cong); null = chua tai/ban xem thu
+  List<Map<String, dynamic>>? _khoCauHoi;
+  final Set<String> _cauThatDaChon = {};
+
+  bool get _cheDoSua => widget.examId != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.tenCoSan != null) _tenController.text = widget.tenCoSan!;
+    if (widget.topicId != null) _taiKhoCauHoi();
+  }
+
+  @override
+  void dispose() {
+    _tenController.dispose();
+    _deController.dispose();
+    _tbController.dispose();
+    _khoController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _taiKhoCauHoi() async {
+    try {
+      final data = await ApiClient().get('topics/${widget.topicId}/questions');
+      if (!mounted) return;
+      setState(() {
+        _khoCauHoi = (data as List).cast<Map<String, dynamic>>();
+      });
+    } on ApiException {
+      // Tai kho that bai: phan ghep thu cong se bao loi khi bam Tao.
+    }
+  }
+
+  int get _tongNgauNhien =>
+      (int.tryParse(_deController.text) ?? 0) +
+      (int.tryParse(_tbController.text) ?? 0) +
+      (int.tryParse(_khoController.text) ?? 0);
+
+  String _nhanMucDo(String difficulty) {
+    switch (difficulty) {
+      case 'easy':
+        return 'Dễ';
+      case 'medium':
+        return 'Trung bình';
+      case 'hard':
+        return 'Khó';
+      default:
+        return difficulty;
+    }
+  }
+
+  Future<void> _bamTaoBoDe() async {
+    final ten = _tenController.text.trim();
+    if (_cheDoSua) {
+      if (ten.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Chưa nhập tên bộ đề')),
+        );
+        return;
+      }
+      setState(() => _dangTao = true);
+      try {
+        await ApiClient().patch('exams/${widget.examId}', {'title': ten});
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã lưu tên bộ đề.')),
+        );
+        Navigator.pop(context);
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() => _dangTao = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      }
+      return;
+    }
+    if (widget.topicId == null) {
+      // Ban giao dien xem thu: giu luong cu, di tiep sang MH-26.
+      Navigator.pushNamed(context, AppRoutes.mh26);
+      return;
+    }
+    if (ten.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chưa nhập tên bộ đề')),
+      );
+      return;
+    }
+    final Map<String, dynamic> body;
+    if (_cachTao == 0) {
+      if (_tongNgauNhien <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tổng số câu phải lớn hơn 0')),
+        );
+        return;
+      }
+      body = {
+        'title': ten,
+        'mode': 'RANDOM',
+        'counts': {
+          'easy': int.tryParse(_deController.text) ?? 0,
+          'medium': int.tryParse(_tbController.text) ?? 0,
+          'hard': int.tryParse(_khoController.text) ?? 0,
+        },
+      };
+    } else {
+      if (_cauThatDaChon.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Chưa chọn câu hỏi nào')),
+        );
+        return;
+      }
+      body = {
+        'title': ten,
+        'mode': 'MANUAL',
+        'questionIds': _cauThatDaChon.toList(),
+      };
+    }
+    setState(() => _dangTao = true);
+    try {
+      final exam = await ApiClient().post(
+        'topics/${widget.topicId}/exams',
+        body,
+      ) as Map<String, dynamic>;
+      if (!mounted) return;
+      // Tao xong -> sang MH-26 cai dat, mang theo ma bo de vua tao.
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => Mh26CaiDatBoDeScreen(
+            examId: exam['id'] as String,
+            tenBoDe: ten,
+          ),
+        ),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _dangTao = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tạo bộ đề')),
+      appBar: AppBar(title: Text(_cheDoSua ? 'Sửa bộ đề' : 'Tạo bộ đề')),
       body: Column(
         children: [
           Expanded(
@@ -53,8 +217,9 @@ class _Mh25TaoSuaBoDeScreenState extends State<Mh25TaoSuaBoDeScreen> {
               children: [
                 const Text('Tên bộ đề', style: TextStyle(color: kTextSub)),
                 const SizedBox(height: 6),
-                const TextField(
-                  decoration: InputDecoration(hintText: 'Ví dụ: Giữa kỳ — Đạo hàm'),
+                TextField(
+                  controller: _tenController,
+                  decoration: const InputDecoration(hintText: 'Ví dụ: Giữa kỳ — Đạo hàm'),
                 ),
                 const SizedBox(height: 18),
                 const Text('Cách tạo bộ đề', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
@@ -74,18 +239,18 @@ class _Mh25TaoSuaBoDeScreenState extends State<Mh25TaoSuaBoDeScreen> {
                 ),
                 const SizedBox(height: 16),
                 if (_cachTao == 0) ...[
-                  const Row(
+                  Row(
                     children: [
-                      Expanded(child: _OSoLuong(nhan: 'Dễ', giaTri: '8', mauSo: kSuccess)),
-                      SizedBox(width: 10),
-                      Expanded(child: _OSoLuong(nhan: 'Trung bình', giaTri: '8', mauSo: Color(0xFFEF8A2A))),
-                      SizedBox(width: 10),
-                      Expanded(child: _OSoLuong(nhan: 'Khó', giaTri: '4', mauSo: kError)),
+                      Expanded(child: _OSoLuong(nhan: 'Dễ', controller: _deController, mauSo: kSuccess, onChanged: () => setState(() {}))),
+                      const SizedBox(width: 10),
+                      Expanded(child: _OSoLuong(nhan: 'Trung bình', controller: _tbController, mauSo: const Color(0xFFEF8A2A), onChanged: () => setState(() {}))),
+                      const SizedBox(width: 10),
+                      Expanded(child: _OSoLuong(nhan: 'Khó', controller: _khoController, mauSo: kError, onChanged: () => setState(() {}))),
                     ],
                   ),
                   const SizedBox(height: 18),
-                  const Center(
-                    child: Text('Tổng: 20 câu', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
+                  Center(
+                    child: Text('Tổng: $_tongNgauNhien câu', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
                   ),
                   const SizedBox(height: 4),
                   const Center(
@@ -94,6 +259,28 @@ class _Mh25TaoSuaBoDeScreenState extends State<Mh25TaoSuaBoDeScreen> {
                       style: TextStyle(color: kTextSub),
                     ),
                   ),
+                ] else if (_khoCauHoi != null) ...[
+                  Text(
+                    'Chọn câu hỏi (đã chọn ${_cauThatDaChon.length}/${_khoCauHoi!.length})',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final q in _khoCauHoi!)
+                    Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: CheckboxListTile(
+                        value: _cauThatDaChon.contains(q['id']),
+                        onChanged: (v) => setState(() {
+                          if (v == true) {
+                            _cauThatDaChon.add(q['id'] as String);
+                          } else {
+                            _cauThatDaChon.remove(q['id']);
+                          }
+                        }),
+                        title: Text(q['content'] as String),
+                        subtitle: Text('Mức độ: ${_nhanMucDo(q['difficulty'] as String)}'),
+                      ),
+                    ),
                 ] else ...[
                   Text(
                     'Chọn câu hỏi (đã chọn ${_cauDaChon.length}/${_mockCauHoi.length})',
@@ -123,8 +310,8 @@ class _Mh25TaoSuaBoDeScreenState extends State<Mh25TaoSuaBoDeScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: NutChinh(
-              text: 'Tạo bộ đề',
-              onPressed: () => Navigator.pushNamed(context, AppRoutes.mh26),
+              text: _dangTao ? 'Đang xử lý...' : (_cheDoSua ? 'Lưu thay đổi' : 'Tạo bộ đề'),
+              onPressed: _dangTao ? () {} : _bamTaoBoDe,
             ),
           ),
         ],
@@ -195,10 +382,16 @@ class _TheCachTao extends StatelessWidget {
 
 class _OSoLuong extends StatelessWidget {
   final String nhan;
-  final String giaTri;
+  final TextEditingController controller;
   final Color mauSo;
+  final VoidCallback onChanged;
 
-  const _OSoLuong({required this.nhan, required this.giaTri, required this.mauSo});
+  const _OSoLuong({
+    required this.nhan,
+    required this.controller,
+    required this.mauSo,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -212,7 +405,18 @@ class _OSoLuong extends StatelessWidget {
         children: [
           Text(nhan, style: const TextStyle(fontSize: 13, color: kTextSub)),
           const SizedBox(height: 4),
-          Text(giaTri, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: mauSo)),
+          TextField(
+            controller: controller,
+            onChanged: (_) => onChanged(),
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: mauSo),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
         ],
       ),
     );
