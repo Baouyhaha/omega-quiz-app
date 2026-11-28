@@ -13,9 +13,7 @@
 ///   nộp bài — câu hỏi phát từ server KHÔNG kèm đáp án đúng/giải thích).
 ///   T21: đồng hồ đếm ngược chạy thật (theo durationMinutes của đề) +
 ///   hết giờ tự nộp + đo thời gian từng câu để tính thưởng tốc độ.
-///   T25: Tip (Gợi Ý Nhẹ) + panel Trợ giúp nối API thật — 50:50,
-///   Thêm Giờ, Đổi Câu, Soi Giải Thích, Khiên An Toàn; số lần
-///   giới hạn theo REQ-F31, server chặn khi bộ đề tắt trợ giúp.
+///   Tip/Trợ giúp vẫn mock.
 ///   T21 là task làm bài (thẻ Trello "T21 — Làm bài: timer + nộp +
 ///   chấm", hạn 23/11 21:00) — MH-09 thuộc T21, còn MH-16 (đối kháng)
 ///   và MH-17 (đợt thi) chỉ là điểm VÀO MH-09, không phải task làm MH-09.
@@ -48,8 +46,6 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
   Timer? _dongHo;
   // Đang tự nộp do hết giờ — chặn tick tiếp theo nộp trùng.
   bool _dangTuNop = false;
-  // Panel Trợ giúp đang mở (nút Trợ giúp bật/tắt) — T25.
-  bool _moPanel = false;
 
   @override
   void initState() {
@@ -170,21 +166,6 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Hết giờ nhưng chưa nộp được. Bấm Nộp bài để nộp tay.')));
-    }
-  }
-
-  /// Dùng 1 quyền trợ giúp cho câu đang xem (T25). Lỗi từ server
-  /// (hết lượt, bộ đề tắt trợ giúp) hiện SnackBar để người làm biết.
-  Future<void> _dungTroGiup(String type) async {
-    final vm = context.read<ExamAttemptViewModel>();
-    if (vm.questions.isEmpty) return;
-    final cauId = vm.questions[_cauHienTai]['id'] as String;
-    try {
-      await vm.useHelper(type, cauId);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -370,34 +351,6 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
                 ),
               ),
             ),
-            // Gợi ý đã mở bằng Tip (T25) — chỉ hiện khi đã dùng quyền.
-            if (vm.hintsShown[questionId] != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: kWarningTint,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text('Gợi ý: ${vm.hintsShown[questionId]}',
-                    style: const TextStyle(color: kTextPrimary)),
-              ),
-            ],
-            // Giải thích đã soi bằng quyền Soi Giải Thích (T25).
-            if (vm.explanationsShown[questionId] != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: kPrimaryTint,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text('Giải thích: ${vm.explanationsShown[questionId]}',
-                    style: const TextStyle(color: kTextPrimary)),
-              ),
-            ],
             const SizedBox(height: 12),
             // 4 ô đáp án — màu huy hiệu chữ lấy từ hằng số kOptionColors.
             // Bấm để chọn, đáp án lưu vào ViewModel (nộp ở MH-09b).
@@ -407,7 +360,6 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
                 text: options[i],
                 color: kOptionColors[i],
                 selected: daChon == i,
-                disabled: vm.hiddenOptions[questionId]?.contains(i) ?? false,
                 onTap: () {
                   // T13: tiếng tap khi chọn đáp án (trong bài thi chỉ
                   // phát tiếng tap, KHÔNG phát tiếng đúng/sai — quy tắc E5).
@@ -446,42 +398,28 @@ class _Mh09LamBaiScreenState extends State<Mh09LamBaiScreen>
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    // Tip = Gợi Ý Nhẹ (T25): mở gợi ý của câu đang xem,
-                    // câu đó bị trừ 20% điểm nếu trả lời đúng. Khóa khi
-                    // đã mở gợi ý câu này hoặc hết lượt dùng.
-                    onPressed: (vm.hintsShown.containsKey(questionId) ||
-                            vm.helperConLai('LIGHT_HINT') <= 0)
-                        ? null
-                        : () => _dungTroGiup('LIGHT_HINT'),
+                    onPressed: () {},
                     // Nút Tip: nền trắng + viền/chữ tím (Figma).
                     style: OutlinedButton.styleFrom(
                         backgroundColor: Colors.white),
                     icon: const Icon(Icons.lightbulb_outline),
-                    label: Text(vm.hintsShown.containsKey(questionId)
-                        ? 'Đã mở gợi ý'
-                        : 'Tip'),
+                    label: const Text('Tip'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => setState(() => _moPanel = !_moPanel),
+                    onPressed: () {},
                     icon: const Icon(Icons.help_outline),
                     label: const Text('Trợ giúp'),
                   ),
                 ),
               ],
             ),
-            // Panel trợ giúp (T25): mở từ nút Trợ giúp, chip nào hết
-            // lượt thì khóa; số lượt còn lại hiện ngay trên nhãn chip.
-            if (_moPanel) ...[
-              const SizedBox(height: 12),
-              _TroGiupPanel(
-                vm: vm,
-                questionId: questionId,
-                onDung: _dungTroGiup,
-              ),
-            ],
+            const SizedBox(height: 12),
+            // Panel trợ giúp — Figma vẽ sẵn dạng mở; khi làm thật thì panel
+            // này mở ra từ nút Trợ giúp (giai đoạn chức năng).
+            const _TroGiupPanel(),
             const SizedBox(height: 12),
             // Cảnh báo rời bài — số thật từ ViewModel (T22), chỉ hiện khi
             // đã vi phạm ít nhất 1 lần. Figma chỉ vẽ dòng chữ đỏ, không
@@ -521,7 +459,6 @@ class _AnswerOption extends StatefulWidget {
     required this.color,
     required this.selected,
     required this.onTap,
-    this.disabled = false,
   });
 
   final String letter;
@@ -529,9 +466,6 @@ class _AnswerOption extends StatefulWidget {
   final Color color;
   final bool selected;
   final VoidCallback onTap;
-
-  /// Bị ẩn bởi trợ giúp 50:50 (T25): mờ đi và không bấm được.
-  final bool disabled;
 
   @override
   State<_AnswerOption> createState() => _AnswerOptionState();
@@ -552,9 +486,7 @@ class _AnswerOptionState extends State<_AnswerOption> {
       child: AnimatedScale(
         scale: _dangBam ? 0.97 : 1.0,
         duration: const Duration(milliseconds: 120),
-        child: Opacity(
-          opacity: widget.disabled ? 0.35 : 1,
-          child: Card(
+        child: Card(
       margin: const EdgeInsets.only(bottom: 8),
           color: widget.selected
               ? widget.color.withValues(alpha: 0.12)
@@ -572,8 +504,7 @@ class _AnswerOptionState extends State<_AnswerOption> {
             ),
             title: Text(widget.text,
                 style: const TextStyle(color: kTextPrimary)),
-            onTap: widget.disabled ? null : widget.onTap,
-          ),
+            onTap: widget.onTap,
           ),
         ),
       ),
@@ -581,36 +512,14 @@ class _AnswerOptionState extends State<_AnswerOption> {
   }
 }
 
-/// Panel trợ giúp (T25): 50:50, Thêm Giờ, Đổi Câu, Soi Giải
-/// Thích, Khiên An Toàn — gọi API thật qua ViewModel; chip hiện
-/// số lượt còn lại, hết lượt thì khóa. "Hỏi Cộng Đồng" đã lọc
-/// khỏi phạm vi — vẽ DISABLED kèm nhãn "Sắp có".
+/// Panel trợ giúp: 50:50, thêm giờ, đổi câu, khiên an toàn.
+/// "Hỏi Cộng Đồng" đã lọc khỏi phạm vi — vẽ DISABLED kèm nhãn "Sắp có".
 class _TroGiupPanel extends StatelessWidget {
-  const _TroGiupPanel({
-    required this.vm,
-    required this.questionId,
-    required this.onDung,
-  });
-
-  final ExamAttemptViewModel vm;
-  final String questionId;
-  final void Function(String type) onDung;
+  const _TroGiupPanel();
 
   @override
   Widget build(BuildContext context) {
     // Chip trợ giúp: nền kPrimaryTint #EFECFE + chữ tím.
-    Widget chip(String type, String nhan) {
-      final conLai = vm.helperConLai(type);
-      final khoa = conLai <= 0;
-      return ActionChip(
-        backgroundColor: kPrimaryTint,
-        label: Text('$nhan · còn $conLai',
-            style: TextStyle(color: khoa ? kTextSecondary : kPrimary)),
-        onPressed: khoa ? null : () => onDung(type),
-      );
-    }
-
-    final daAn5050 = vm.hiddenOptions.containsKey(questionId);
     return Card(
       // Viền thẻ kBorder #E9E6F7.
       shape: RoundedRectangleBorder(
@@ -632,63 +541,43 @@ class _TroGiupPanel extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                // 50:50 khóa thêm khi câu đang xem đã bị ẩn đáp án.
                 ActionChip(
                   backgroundColor: kPrimaryTint,
-                  label: Text(
-                      '50:50 · còn ${vm.helperConLai('FIFTY_FIFTY')}',
-                      style: TextStyle(
-                          color: (daAn5050 || vm.helperConLai('FIFTY_FIFTY') <= 0)
-                              ? kTextSecondary
-                              : kPrimary)),
-                  onPressed: (daAn5050 || vm.helperConLai('FIFTY_FIFTY') <= 0)
-                      ? null
-                      : () => onDung('FIFTY_FIFTY'),
+                  label: const Text('50:50',
+                      style: TextStyle(color: kPrimary)),
+                  onPressed: () {},
                 ),
-                chip('EXTRA_TIME', 'Thêm giờ +15s'),
-                chip('CHANGE_QUESTION', 'Đổi câu'),
-                chip('VIEW_EXPLANATION', 'Soi giải thích'),
                 ActionChip(
                   backgroundColor: kPrimaryTint,
-                  label: Text(
-                      vm.shieldActive
-                          ? 'Khiên an toàn · Đang bật'
-                          : 'Khiên an toàn · còn ${vm.helperConLai('SAFE_SHIELD')}',
-                      style: TextStyle(
-                          color: (vm.shieldActive ||
-                                  vm.helperConLai('SAFE_SHIELD') <= 0)
-                              ? kTextSecondary
-                              : kPrimary)),
-                  onPressed: (vm.shieldActive ||
-                          vm.helperConLai('SAFE_SHIELD') <= 0)
-                      ? null
-                      : () => onDung('SAFE_SHIELD'),
+                  label: const Text('Thêm giờ +15s',
+                      style: TextStyle(color: kPrimary)),
+                  onPressed: () {},
+                ),
+                ActionChip(
+                  backgroundColor: kPrimaryTint,
+                  label: const Text('Đổi câu',
+                      style: TextStyle(color: kPrimary)),
+                  onPressed: () {},
+                ),
+                ActionChip(
+                  backgroundColor: kPrimaryTint,
+                  label: const Text('Khiên an toàn',
+                      style: TextStyle(color: kPrimary)),
+                  onPressed: () {},
                 ),
                 // Đã lọc khỏi phạm vi — onPressed null = disabled.
                 // Figma: nền xám #E5E7EB + chữ #6E6A8A.
                 ActionChip(
-                  backgroundColor: kDisabledBg,
-                  disabledColor: kDisabledBg,
+                  backgroundColor:
+                      kDisabledBg,
+                  disabledColor:
+                      kDisabledBg,
                   label: const Text('Hỏi Cộng Đồng · Sắp có',
                       style: TextStyle(color: kTextSecondary)),
                   onPressed: null,
                 ),
               ],
             ),
-            if (vm.shieldActive) ...[
-              const SizedBox(height: 10),
-              const Row(
-                children: [
-                  Icon(Icons.shield_rounded, size: 18, color: kSuccess),
-                  SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                        'Khiên đang bật: câu sai đầu tiên sẽ không tính sai',
-                        style: TextStyle(color: kTextSecondary)),
-                  ),
-                ],
-              ),
-            ],
           ],
         ),
       ),

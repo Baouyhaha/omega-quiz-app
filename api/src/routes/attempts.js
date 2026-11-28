@@ -72,35 +72,16 @@ router.post('/exams/:id/attempts', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-// Luat so lan dung moi quyen tro giup trong 1 luot lam (REQ-F31):
-// 50:50 1 lan, Goi Y Nhe 2 lan (cau da xem goi y bi tru 20% diem),
-// Soi Giai Thich 1 lan, Doi Cau 1 lan, Them Gio 2 lan, Khien 1 lan.
-// Hoi Cong Dong da loc khoi pham vi (chi disabled o app).
-const HELPER_LIMITS = {
-  FIFTY_FIFTY: 1, LIGHT_HINT: 2, VIEW_EXPLANATION: 1,
-  CHANGE_QUESTION: 1, EXTRA_TIME: 2, SAFE_SHIELD: 1,
-};
-
 router.post('/attempts/:id/helpers', async (req, res, next) => {
   try {
     const attempt = await repo.get('attempts', req.params.id);
     if (!attempt || attempt.userId !== req.user.uid) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy lượt làm');
     if (attempt.status !== 'IN_PROGRESS') throw new ApiError(409, 'VALIDATION_ERROR', 'Lượt làm đã kết thúc');
     const { type, questionId } = req.body || {};
-    if (!(type in HELPER_LIMITS)) throw new ApiError(400, 'VALIDATION_ERROR', 'Loại trợ giúp không hợp lệ');
-    // Bo de tat tro giup (cai dat allowHelpers) thi chan moi quyen
-    if (attempt.examId) {
-      const exam = await repo.get('exams', attempt.examId);
-      if (exam && exam.settings && exam.settings.allowHelpers === false) {
-        throw new ApiError(403, 'HELPERS_DISABLED', 'Bộ đề này đã tắt trợ giúp');
-      }
-    }
-    const usedCount = attempt.helpersUsed.filter((h) => h.type === type).length;
-    if (usedCount >= HELPER_LIMITS[type]) {
-      throw new ApiError(400, 'HELPER_LIMIT_REACHED', `Đã hết lượt dùng trợ giúp này (tối đa ${HELPER_LIMITS[type]} lần mỗi lượt làm)`);
-    }
     const q = await repo.get('questions', questionId);
     if (!q) throw new ApiError(400, 'VALIDATION_ERROR', 'Thiếu hoặc sai questionId');
+    attempt.helpersUsed.push({ type, questionId, at: nowISO() });
+    await repo.put('attempts', attempt.id, attempt);
     let data = { type };
     if (type === 'FIFTY_FIFTY') {
       const wrong = [0, 1, 2, 3].filter((i) => i !== q.correctOption);
@@ -123,10 +104,9 @@ router.post('/attempts/:id/helpers', async (req, res, next) => {
     } else if (type === 'SAFE_SHIELD') {
       attempt.shield = true;
       data = { ...data, shield: true };
+    } else {
+      throw new ApiError(400, 'VALIDATION_ERROR', 'Loại trợ giúp không hợp lệ');
     }
-    // Chi ghi nhan luot dung SAU khi xu ly thanh cong (vd Doi Cau
-    // het cau thay the thi nem loi o tren, khong mat luot).
-    attempt.helpersUsed.push({ type, questionId, at: nowISO() });
     await repo.put('attempts', attempt.id, attempt);
     ok(res, data, 'Đã dùng quyền trợ giúp');
   } catch (e) { next(e); }

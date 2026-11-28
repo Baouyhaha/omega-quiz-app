@@ -30,40 +30,6 @@ class ExamAttemptViewModel extends ChangeNotifier {
   int violations = 0;
   AttemptStatus status = AttemptStatus.inProgress;
 
-  // --- Tro giup (T25) ---
-  /// Giới hạn số lần dùng mỗi quyền trong 1 lượt làm — khớp luật
-  /// phía server (api attempts.js HELPER_LIMITS, theo REQ-F31).
-  static const Map<String, int> helperLimits = {
-    'FIFTY_FIFTY': 1,
-    'LIGHT_HINT': 2,
-    'VIEW_EXPLANATION': 1,
-    'CHANGE_QUESTION': 1,
-    'EXTRA_TIME': 2,
-    'SAFE_SHIELD': 1,
-  };
-
-  /// Số lần đã dùng từng quyền (để khóa chip khi hết lượt).
-  Map<String, int> helperCounts = {};
-
-  /// Đáp án bị ẩn bởi 50:50, theo từng câu (questionId -> tập chỉ số).
-  Map<String, Set<int>> hiddenOptions = {};
-
-  /// Gợi ý đã mở (Gợi Ý Nhẹ) theo từng câu.
-  Map<String, String> hintsShown = {};
-
-  /// Giải thích đã soi (Soi Giải Thích) theo từng câu.
-  Map<String, String> explanationsShown = {};
-
-  /// Tổng số giây được cộng thêm bởi quyền Thêm Giờ.
-  int extraSeconds = 0;
-
-  /// Khiên An Toàn đang bật (1 câu sai đầu tiên được tha khi chấm).
-  bool shieldActive = false;
-
-  /// Số lượt còn lại của 1 quyền trợ giúp.
-  int helperConLai(String type) =>
-      (helperLimits[type] ?? 0) - (helperCounts[type] ?? 0);
-
   /// Câu đang làm + mốc vào câu — đo thời gian từng câu bằng mốc giờ
   /// (vào câu lúc nào, rời câu lúc nào) thay vì đếm từng giây bằng
   /// đồng hồ: câu nào làm dưới 1 giây (bấm nhanh) vẫn được ghi nhận
@@ -83,8 +49,7 @@ class ExamAttemptViewModel extends ChangeNotifier {
     final phut = durationMinutes;
     final batDau = thoiDiemBatDau;
     if (phut == null || batDau == null) return 0;
-    final conLai =
-        phut * 60 + extraSeconds - DateTime.now().difference(batDau).inSeconds;
+    final conLai = phut * 60 - DateTime.now().difference(batDau).inSeconds;
     return conLai < 0 ? 0 : conLai;
   }
 
@@ -105,12 +70,6 @@ class ExamAttemptViewModel extends ChangeNotifier {
     _thoiDiemVaoCau = null;
     violations = 0;
     status = AttemptStatus.inProgress;
-    helperCounts = {};
-    hiddenOptions = {};
-    hintsShown = {};
-    explanationsShown = {};
-    extraSeconds = 0;
-    shieldActive = false;
     // Bắt đầu tính giờ câu đầu tiên ngay khi đề tải xong.
     if (questions.isNotEmpty) {
       _cauDangLam = questions.first['id'] as String;
@@ -166,65 +125,6 @@ class ExamAttemptViewModel extends ChangeNotifier {
     }
     notifyListeners();
     return forceSubmitted;
-  }
-
-  /// Dùng 1 quyền trợ giúp (T25): gọi POST attempts/{id}/helpers
-  /// rồi áp hiệu ứng vào trạng thái lượt làm. Lỗi (hết lượt, bộ đề
-  /// tắt trợ giúp...) ném ApiException để màn hình báo cho người làm.
-  Future<void> useHelper(String type, String questionId) async {
-    if (attemptId == null) return;
-    if (status != AttemptStatus.inProgress) return;
-    final data = await _api.post('attempts/$attemptId/helpers', {
-      'type': type,
-      'questionId': questionId,
-    });
-    helperCounts[type] = (helperCounts[type] ?? 0) + 1;
-    switch (type) {
-      case 'FIFTY_FIFTY':
-        hiddenOptions[questionId] = Set<int>.from(
-          (data['hiddenOptions'] as List).map((e) => (e as num).toInt()),
-        );
-        // Đáp án đang chọn mà bị ẩn (chỉ ẩn đáp án sai) thì bỏ chọn.
-        final dangChon = selectedAnswers[questionId];
-        if (dangChon != null && hiddenOptions[questionId]!.contains(dangChon)) {
-          selectedAnswers.remove(questionId);
-        }
-        break;
-      case 'LIGHT_HINT':
-        hintsShown[questionId] = (data['hint'] as String?) ?? '';
-        break;
-      case 'VIEW_EXPLANATION':
-        explanationsShown[questionId] =
-            (data['explanation'] as String?) ?? '';
-        break;
-      case 'CHANGE_QUESTION':
-        final moi = Map<String, dynamic>.from(data['newQuestion'] as Map);
-        final idx = questions.indexWhere((q) => q['id'] == questionId);
-        if (idx >= 0) {
-          questions[idx] = moi;
-          // Đáp án đã chọn cho câu cũ không còn nghĩa — bỏ; thời
-          // gian đã đo chuyển sang câu mới để thưởng tốc độ vẫn
-          // tính đủ từng câu khi nộp.
-          selectedAnswers.remove(questionId);
-          hiddenOptions.remove(questionId);
-          hintsShown.remove(questionId);
-          explanationsShown.remove(questionId);
-          final tg = timePerQuestion.remove(questionId);
-          if (tg != null) timePerQuestion[moi['id'] as String] = tg;
-          if (_cauDangLam == questionId) {
-            _cauDangLam = moi['id'] as String;
-            _thoiDiemVaoCau = DateTime.now();
-          }
-        }
-        break;
-      case 'EXTRA_TIME':
-        extraSeconds = (data['extraSeconds'] as num?)?.toInt() ?? extraSeconds;
-        break;
-      case 'SAFE_SHIELD':
-        shieldActive = true;
-        break;
-    }
-    notifyListeners();
   }
 
   /// Nộp bài thường — T23 gọi từ MH-09b, T21 gọi khi hết giờ tự nộp.
